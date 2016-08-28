@@ -14,7 +14,11 @@ import (
 	"sync"
 )
 
-// TODO follow https redirects?, MX records? (add www, mx, mail....
+/* TODO
+	follow http redirects
+	starttls
+	add www, mx, mail....
+*/
 
 type DomainNode struct {
 	Domain string
@@ -27,13 +31,13 @@ var conf = &tls.Config{
 	InsecureSkipVerify: true,
 }
 var markedDomains = make(map[string]bool)
-var domainGraph = make(map[string]*DomainNode) // TODO make node containging depth? domains, and more data? (port(s), backendges, parents)
+var domainGraph = make(map[string]*DomainNode)
 var timeout time.Duration
 var port string
 var verbose bool
 var depth int
 var maxDepth int
-var threads int
+var parallel int
 
 func v(a ...interface{}) {
 	if verbose {
@@ -42,25 +46,24 @@ func v(a ...interface{}) {
 }
 
 
-// TODO print error domain
-func checkNetErr(err error) bool {
+func checkNetErr(err error, domain string) bool {
 	if err == nil {
 		return false
 
 	} else if netError, ok := err.(net.Error); ok && netError.Timeout() {
-		v("Timeout")
+		v("Timeout", domain)
 	} else {
 		switch t := err.(type) {
 		case *net.OpError:
 			if t.Op == "dial" {
-				v("Unknown host")
+				v("Unknown host", domain)
 			} else if t.Op == "read" {
-				v("Connection refused")
+				v("Connection refused", domain)
 			}
 
 		case syscall.Errno:
 			if t == syscall.ECONNREFUSED {
-				v("Connection refused")
+				v("Connection refused", domain)
 			}
 		}
 	}
@@ -94,16 +97,19 @@ func printGraph() {
 }
 
 
-// todo test with negative threads, rename threads to parallel
 func main() {
 	host := flag.String("host", "localhost", "Host to Scan")
 	flag.StringVar(&port, "port", "443", "Port to connect to")
 	timeoutPtr := flag.Int("timeout", 5, "TCP Timeout in seconds")
 	flag.BoolVar(&verbose, "verbose", false, "Verbose logging")
-	flag.IntVar(&maxDepth, "depth", 20, "Maximum BFS Depth to go")
-	flag.IntVar(&threads, "threads", 10, "Number of certificates to retrieve in parallel")
+	flag.IntVar(&maxDepth, "depth", 20, "Maximum BFS depth to go")
+	flag.IntVar(&parallel, "parallel", 10, "Number of certificates to retrieve in parallel")
 
 	flag.Parse()
+	if parallel < 1 {
+		fmt.Fprintln(os.Stderr, "Must enter a positive number of parallel threads")
+		return
+	}
 	timeout = time.Duration(*timeoutPtr) * time.Second
 	startDomain := strings.ToLower(*host)
 
@@ -113,8 +119,8 @@ func main() {
 
 	printGraph()
 
-	v("Found", len(domainGraph), "domains") // todo 
-	v("Graph Depth:", depth) // todo
+	v("Found", len(domainGraph), "domains") // todo verify
+	v("Graph Depth:", depth)
 
 }
 
@@ -125,8 +131,8 @@ func BFS(root string) {
 	domainGraphChan := make(chan *DomainNode, 5)
 
 	// thread limit code
-	threadPass := make(chan bool, threads)
-	for i:=0; i< threads; i++ {
+	threadPass := make(chan bool, parallel)
+	for i:=0; i< parallel; i++ {
 		threadPass <-true
 	}
 
@@ -157,6 +163,7 @@ func BFS(root string) {
 
 					// do things
 					dDomain := directDomain(domainNode.Domain)
+					v("Visiting", domainNode.Depth, dDomain)
 					neighbors := BFSPeers(dDomain) // visit
 					domainNode.Neighbors = &neighbors
 					domainGraphChan <- domainNode
@@ -186,13 +193,12 @@ func BFS(root string) {
 		}
 	}()
 
-	wg.Wait() // wait for query to finish
+	wg.Wait() // wait for querying to finish
 	close(domainGraphChan)
 	<-done // wait for save to finish
 }
 
 func BFSPeers(host string) []string {
-	v("Visiting", host)
 	domains := make([]string, 0)
 	certs := getPeerCerts(host)
 
@@ -232,7 +238,7 @@ func getPeerCerts(host string) []*x509.Certificate {
 	addr := net.JoinHostPort(host, port)
 	dialer := &net.Dialer{Timeout: timeout}
 	conn, err := tls.DialWithDialer(dialer, "tcp", addr, conf)
-	if checkNetErr(err) {
+	if checkNetErr(err, host) {
 		return make([]*x509.Certificate, 0)
 
 	}
