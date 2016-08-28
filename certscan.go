@@ -23,7 +23,7 @@ add www, mx, mail....
 // structure to store a domain and its edges
 type DomainNode struct {
 	Domain    string
-	Depth     int
+	Depth     uint
 	Neighbors *[]string
 }
 
@@ -31,30 +31,44 @@ type DomainNode struct {
 var conf = &tls.Config{InsecureSkipVerify: true}
 var markedDomains = make(map[string]bool)
 var domainGraph = make(map[string]*DomainNode)
-var timeout time.Duration
+var depth uint
+
+// flags
 var port string
+var timeout time.Duration
 var verbose bool
-var depth int
-var maxDepth int
-var parallel int
+var maxDepth uint
+var parallel uint
 
 func main() {
-	host := flag.String("host", "localhost", "Host to Scan")
-	flag.StringVar(&port, "port", "443", "Port to connect to")
-	timeoutPtr := flag.Int("timeout", 5, "TCP Timeout in seconds")
-	flag.BoolVar(&verbose, "verbose", false, "Verbose logging")
-	flag.IntVar(&maxDepth, "depth", 20, "Maximum BFS depth to go")
-	flag.IntVar(&parallel, "parallel", 10, "Number of certificates to retrieve in parallel")
+	flag.StringVar(&port, "port", "443", "tcp port to connect to") // TODO make uint
+	timeoutPtr := flag.Uint("timeout", 5, "tcp timeout in seconds")
+	flag.BoolVar(&verbose, "verbose", false, "verbose logging")
+	flag.UintVar(&maxDepth, "depth", 20, "maximum BFS depth to go")
+	flag.UintVar(&parallel, "parallel", 10, "number of certificates to retrieve in parallel")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage of %s: [OPTION]... HOST...\n", os.Args[0])
+		flag.PrintDefaults()
+	}
 
 	flag.Parse()
+	if flag.NArg() < 1 {
+		fmt.Fprintln(os.Stderr, "Pass at least one domain to scan")
+		flag.Usage()
+		return
+	}
 	if parallel < 1 {
 		fmt.Fprintln(os.Stderr, "Must enter a positive number of parallel threads")
+		flag.Usage()
 		return
 	}
 	timeout = time.Duration(*timeoutPtr) * time.Second
-	startDomain := strings.ToLower(*host)
+	startDomains := flag.Args()
+	for i := range startDomains {
+		startDomains[i] = strings.ToLower(startDomains[i])
+	}
 
-	BFS(startDomain)
+	BFS(startDomains)
 
 	v("Done...")
 
@@ -63,7 +77,7 @@ func main() {
 	v("Graph Depth:", depth)
 }
 
-// Verbose Log
+// verbose log
 func v(a ...interface{}) {
 	if verbose {
 		fmt.Fprintln(os.Stderr, a...)
@@ -120,19 +134,21 @@ func printGraph() {
 }
 
 // perform Breadth-first_search to build the graph
-func BFS(root string) {
+func BFS(roots []string) {
 	var wg sync.WaitGroup
 	domainChan := make(chan *DomainNode, 5)
 	domainGraphChan := make(chan *DomainNode, 5)
 
 	// thread limit code
 	threadPass := make(chan bool, parallel)
-	for i := 0; i < parallel; i++ {
+	for i := uint(0); i < parallel; i++ {
 		threadPass <- true
 	}
 
-	wg.Add(1)
-	domainChan <- &DomainNode{root, 0, nil}
+	for _, root := range roots { // TODO test
+		wg.Add(1)
+		domainChan <- &DomainNode{root, 0, nil}
+	}
 	go func() {
 		for {
 			domainNode := <-domainChan
