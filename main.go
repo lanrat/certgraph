@@ -12,23 +12,31 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"sync"
 )
 
-// TODO follow https redirects?
+// TODO follow https redirects?, MX records? (add www, mx, mail....
+
+type DomainNode struct {
+	Domain string
+	Depth  int
+    Neighbors *[]string
+}
 
 // vars
 var conf = &tls.Config{
 	InsecureSkipVerify: true,
 }
 var markedDomains = make(map[string]bool)
-var domainGraph = make(map[string][]string)
+var domainGraph = make(map[string]*DomainNode) // TODO make node containging depth? domains, and more data? (port(s), backendges, parents)
 var timeout time.Duration
 var port string
 var quiet bool
 var depth int
 var maxDepth int
+var threads int
 
-func checkErr(err error) bool {
+func checkNetErr(err error) bool {
 	if err == nil {
 		return false
 
@@ -71,7 +79,7 @@ func printGraph() {
 	sort.Strings(domains)
 
 	for _, domain := range domains {
-		fmt.Println(domain, domainGraph[domain])
+		fmt.Println(domain, domainGraph[domain].Depth, domainGraph[domain].Neighbors)
 	}
 }
 
@@ -82,7 +90,7 @@ func main() {
 	timeoutPtr := flag.Int("timeout", 5, "TCP Timeout in seconds")
 	flag.BoolVar(&quiet, "quiet", false, "Do not print domains as they are visited")
 	flag.IntVar(&maxDepth, "depth", 20, "Maximum BFS Depth to go")
-	// TODO threads
+	flag.IntVar(&threads, "threads", 10, "Number of certificates to retrieve in parallel")
 
 	flag.Parse()
 	if quiet {
@@ -104,30 +112,76 @@ func main() {
 }
 
 func BFS(root string) {
-	var domainQueue = make(Queue, 0)
-	domainQueue.Push(&Node{root, 0})
-	markedDomains[directDomain(root)] = true
+	// parallel code
+	var wg sync.WaitGroup
+	domainChan := make(chan *DomainNode, 5)
+	domainGraphChan := make(chan *DomainNode, 5)
 
-	for domainQueue.Len() > 0 {
-		domainNode := domainQueue.Pop()
-		if domainNode.Depth > maxDepth {
-			log.Println("Max Depth Reached, skipping:", domainNode.Domain)
-			continue
-		}
-		if domainNode.Depth > depth {
-			depth = domainNode.Depth
-		}
-		domain := directDomain(domainNode.Domain)
-		neighbors := BFSPeers(domain) // visit
-		domainGraph[domain] = neighbors
-		for _, neighbor := range neighbors {
-			directNeighbor := directDomain(neighbor)
-			if !markedDomains[directNeighbor] {
-				markedDomains[directNeighbor] = true
-				domainQueue.Push(&Node{neighbor, domainNode.Depth + 1})
+	// thread limit code
+	threadPass := make(chan bool, threads)
+	for i:=0; i< threads; i++ {
+		threadPass <-true
+	}
+
+	wg.Add(1)
+	domainChan <- &DomainNode{root, 0, nil}
+	go func() {
+		for {
+			domainNode := <- domainChan
+
+			// depth check
+			if domainNode.Depth > maxDepth {
+				log.Println("Max depth reached, skipping:", domainNode.Domain)
+				wg.Done()
+				continue
+			}
+			if domainNode.Depth > depth {
+				depth = domainNode.Depth
+			}
+
+			dDomain := directDomain(domainNode.Domain)
+			if !markedDomains[dDomain] {
+				markedDomains[dDomain] = true
+				go func(domainNode *DomainNode) {
+				 	defer wg.Done()
+				 	// wait for pass
+				 	<-threadPass
+				 	defer func() {threadPass <- true}()
+
+					// do things
+					dDomain := directDomain(domainNode.Domain)
+					neighbors := BFSPeers(dDomain) // visit
+					domainNode.Neighbors = &neighbors
+					domainGraphChan <- domainNode
+					for _, neighbor := range neighbors {
+						wg.Add(1)
+						domainChan <- &DomainNode{neighbor, domainNode.Depth + 1, nil}
+					}
+				}(domainNode)
+			} else {
+				wg.Done()
 			}
 		}
-	}
+	}()
+
+	// save thread
+	done := make(chan bool)
+	go func() {
+		for {
+			domainNode, more := <- domainGraphChan
+			if more {
+				dDomain := directDomain(domainNode.Domain)
+				domainGraph[dDomain] = domainNode // not thread safe
+			} else {
+				done <- true
+				return
+			}
+		}
+	}()
+
+	wg.Wait() // wait for query to finish
+	close(domainGraphChan)
+	<-done // wait for save to finish
 }
 
 func BFSPeers(host string) []string {
@@ -164,7 +218,7 @@ func getPeerCerts(host string) []*x509.Certificate {
 	addr := net.JoinHostPort(host, port)
 	dialer := &net.Dialer{Timeout: timeout}
 	conn, err := tls.DialWithDialer(dialer, "tcp", addr, conf)
-	if checkErr(err) {
+	if checkNetErr(err) {
 		return make([]*x509.Certificate, 0)
 
 	}
