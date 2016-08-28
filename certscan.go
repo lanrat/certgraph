@@ -5,31 +5,30 @@ import (
 	"crypto/x509"
 	"flag"
 	"fmt"
-	"os"
 	"net"
+	"os"
 	"sort"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
-	"sync"
 )
 
 /* TODO
-	follow http redirects
-	starttls
-	add www, mx, mail....
+follow http redirects
+starttls
+add www, mx, mail....
 */
 
+// structure to store a domain and its edges
 type DomainNode struct {
-	Domain string
-	Depth  int
-    Neighbors *[]string
+	Domain    string
+	Depth     int
+	Neighbors *[]string
 }
 
 // vars
-var conf = &tls.Config{
-	InsecureSkipVerify: true,
-}
+var conf = &tls.Config{InsecureSkipVerify: true}
 var markedDomains = make(map[string]bool)
 var domainGraph = make(map[string]*DomainNode)
 var timeout time.Duration
@@ -39,13 +38,39 @@ var depth int
 var maxDepth int
 var parallel int
 
+func main() {
+	host := flag.String("host", "localhost", "Host to Scan")
+	flag.StringVar(&port, "port", "443", "Port to connect to")
+	timeoutPtr := flag.Int("timeout", 5, "TCP Timeout in seconds")
+	flag.BoolVar(&verbose, "verbose", false, "Verbose logging")
+	flag.IntVar(&maxDepth, "depth", 20, "Maximum BFS depth to go")
+	flag.IntVar(&parallel, "parallel", 10, "Number of certificates to retrieve in parallel")
+
+	flag.Parse()
+	if parallel < 1 {
+		fmt.Fprintln(os.Stderr, "Must enter a positive number of parallel threads")
+		return
+	}
+	timeout = time.Duration(*timeoutPtr) * time.Second
+	startDomain := strings.ToLower(*host)
+
+	BFS(startDomain)
+
+	v("Done...")
+
+	printGraph()
+	v("Found", len(domainGraph), "domains")
+	v("Graph Depth:", depth)
+}
+
+// Verbose Log
 func v(a ...interface{}) {
 	if verbose {
 		fmt.Fprintln(os.Stderr, a...)
 	}
 }
 
-
+// Check for errors, print if network related
 func checkNetErr(err error, domain string) bool {
 	if err == nil {
 		return false
@@ -70,9 +95,7 @@ func checkNetErr(err error, domain string) bool {
 	return true
 }
 
-/*
-* given a domain returns the non-wildecard version of that domain
- */
+// given a domain returns the non-wildcard version of that domain
 func directDomain(domain string) string {
 	if len(domain) < 3 {
 		return domain
@@ -83,8 +106,8 @@ func directDomain(domain string) string {
 	return domain
 }
 
+// prints the adjacency list in sorted order
 func printGraph() {
-	// print map in sorted order
 	domains := make([]string, 0, len(domainGraph))
 	for domain, _ := range domainGraph {
 		domains = append(domains, domain)
@@ -96,51 +119,23 @@ func printGraph() {
 	}
 }
 
-
-func main() {
-	host := flag.String("host", "localhost", "Host to Scan")
-	flag.StringVar(&port, "port", "443", "Port to connect to")
-	timeoutPtr := flag.Int("timeout", 5, "TCP Timeout in seconds")
-	flag.BoolVar(&verbose, "verbose", false, "Verbose logging")
-	flag.IntVar(&maxDepth, "depth", 20, "Maximum BFS depth to go")
-	flag.IntVar(&parallel, "parallel", 10, "Number of certificates to retrieve in parallel")
-
-	flag.Parse()
-	if parallel < 1 {
-		fmt.Fprintln(os.Stderr, "Must enter a positive number of parallel threads")
-		return
-	}
-	timeout = time.Duration(*timeoutPtr) * time.Second
-	startDomain := strings.ToLower(*host)
-
-	BFS(startDomain)
-
-	v("Done...")
-
-	printGraph()
-
-	v("Found", len(domainGraph), "domains") // todo verify
-	v("Graph Depth:", depth)
-
-}
-
+// perform Breadth-first_search to build the graph
 func BFS(root string) {
-	// parallel code
 	var wg sync.WaitGroup
 	domainChan := make(chan *DomainNode, 5)
 	domainGraphChan := make(chan *DomainNode, 5)
 
 	// thread limit code
 	threadPass := make(chan bool, parallel)
-	for i:=0; i< parallel; i++ {
-		threadPass <-true
+	for i := 0; i < parallel; i++ {
+		threadPass <- true
 	}
 
 	wg.Add(1)
 	domainChan <- &DomainNode{root, 0, nil}
 	go func() {
 		for {
-			domainNode := <- domainChan
+			domainNode := <-domainChan
 
 			// depth check
 			if domainNode.Depth > maxDepth {
@@ -156,10 +151,10 @@ func BFS(root string) {
 			if !markedDomains[dDomain] {
 				markedDomains[dDomain] = true
 				go func(domainNode *DomainNode) {
-				 	defer wg.Done()
-				 	// wait for pass
-				 	<-threadPass
-				 	defer func() {threadPass <- true}()
+					defer wg.Done()
+					// wait for pass
+					<-threadPass
+					defer func() { threadPass <- true }()
 
 					// do things
 					dDomain := directDomain(domainNode.Domain)
@@ -182,7 +177,7 @@ func BFS(root string) {
 	done := make(chan bool)
 	go func() {
 		for {
-			domainNode, more := <- domainGraphChan
+			domainNode, more := <-domainGraphChan
 			if more {
 				dDomain := directDomain(domainNode.Domain)
 				domainGraph[dDomain] = domainNode // not thread safe
@@ -198,6 +193,7 @@ func BFS(root string) {
 	<-done // wait for save to finish
 }
 
+// visit each node and get its neighbors
 func BFSPeers(host string) []string {
 	domains := make([]string, 0)
 	certs := getPeerCerts(host)
@@ -234,6 +230,7 @@ func BFSPeers(host string) []string {
 
 }
 
+// gets the certificats found for a given domain
 func getPeerCerts(host string) []*x509.Certificate {
 	addr := net.JoinHostPort(host, port)
 	dialer := &net.Dialer{Timeout: timeout}
