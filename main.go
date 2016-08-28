@@ -5,8 +5,7 @@ import (
 	"crypto/x509"
 	"flag"
 	"fmt"
-	"io/ioutil"
-	"log"
+	"os"
 	"net"
 	"sort"
 	"strings"
@@ -31,29 +30,37 @@ var markedDomains = make(map[string]bool)
 var domainGraph = make(map[string]*DomainNode) // TODO make node containging depth? domains, and more data? (port(s), backendges, parents)
 var timeout time.Duration
 var port string
-var quiet bool
+var verbose bool
 var depth int
 var maxDepth int
 var threads int
 
+func v(a ...interface{}) {
+	if verbose {
+		fmt.Fprintln(os.Stderr, a...)
+	}
+}
+
+
+// TODO print error domain
 func checkNetErr(err error) bool {
 	if err == nil {
 		return false
 
 	} else if netError, ok := err.(net.Error); ok && netError.Timeout() {
-		log.Println("Timeout")
+		v("Timeout")
 	} else {
 		switch t := err.(type) {
 		case *net.OpError:
 			if t.Op == "dial" {
-				log.Println("Unknown host")
+				v("Unknown host")
 			} else if t.Op == "read" {
-				log.Println("Connection refused")
+				v("Connection refused")
 			}
 
 		case syscall.Errno:
 			if t == syscall.ECONNREFUSED {
-				log.Println("Connection refused")
+				v("Connection refused")
 			}
 		}
 	}
@@ -64,6 +71,9 @@ func checkNetErr(err error) bool {
 * given a domain returns the non-wildecard version of that domain
  */
 func directDomain(domain string) string {
+	if len(domain) < 3 {
+		return domain
+	}
 	if domain[0:2] == "*." {
 		domain = domain[2:]
 	}
@@ -79,35 +89,32 @@ func printGraph() {
 	sort.Strings(domains)
 
 	for _, domain := range domains {
-		fmt.Println(domain, domainGraph[domain].Depth, domainGraph[domain].Neighbors)
+		fmt.Println(domain, domainGraph[domain].Depth, *domainGraph[domain].Neighbors)
 	}
 }
 
+
+// todo test with negative threads, rename threads to parallel
 func main() {
-	log.SetFlags(0)
 	host := flag.String("host", "localhost", "Host to Scan")
 	flag.StringVar(&port, "port", "443", "Port to connect to")
 	timeoutPtr := flag.Int("timeout", 5, "TCP Timeout in seconds")
-	flag.BoolVar(&quiet, "quiet", false, "Do not print domains as they are visited")
+	flag.BoolVar(&verbose, "verbose", false, "Verbose logging")
 	flag.IntVar(&maxDepth, "depth", 20, "Maximum BFS Depth to go")
 	flag.IntVar(&threads, "threads", 10, "Number of certificates to retrieve in parallel")
 
 	flag.Parse()
-	if quiet {
-		log.SetOutput(ioutil.Discard)
-	}
 	timeout = time.Duration(*timeoutPtr) * time.Second
-
 	startDomain := strings.ToLower(*host)
 
 	BFS(startDomain)
 
-	log.Println("Done...")
+	v("Done...")
 
 	printGraph()
 
-	log.Println("Found", len(domainGraph), "domains")
-	log.Println("Graph Depth:", depth)
+	v("Found", len(domainGraph), "domains") // todo 
+	v("Graph Depth:", depth) // todo
 
 }
 
@@ -131,7 +138,7 @@ func BFS(root string) {
 
 			// depth check
 			if domainNode.Depth > maxDepth {
-				log.Println("Max depth reached, skipping:", domainNode.Domain)
+				v("Max depth reached, skipping:", domainNode.Domain)
 				wg.Done()
 				continue
 			}
@@ -185,7 +192,7 @@ func BFS(root string) {
 }
 
 func BFSPeers(host string) []string {
-	log.Println("Visiting", host)
+	v("Visiting", host)
 	domains := make([]string, 0)
 	certs := getPeerCerts(host)
 
@@ -196,13 +203,20 @@ func BFSPeers(host string) []string {
 	// used to ensure uniq entries in domains array
 	domainMap := make(map[string]bool)
 
-	cn := strings.ToLower(certs[0].Subject.CommonName)
-	domainMap[cn] = true
+	// add the CommonName just to be safe
+	if len(certs) > 0 {
+		cn := strings.ToLower(certs[0].Subject.CommonName)
+		if len(cn) > 0 {
+			domainMap[cn] = true
+		}
+	}
 
 	for _, cert := range certs {
 		for _, domain := range cert.DNSNames {
-			domain = strings.ToLower(domain)
-			domainMap[domain] = true
+			if len(domain) > 0 {
+				domain = strings.ToLower(domain)
+				domainMap[domain] = true
+			}
 		}
 	}
 
