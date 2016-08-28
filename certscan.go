@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -17,7 +18,6 @@ import (
 /* TODO
 follow http redirects
 starttls
-add www, mx, mail....
 */
 
 // structure to store a domain and its edges
@@ -41,7 +41,7 @@ var maxDepth uint
 var parallel uint
 
 func main() {
-	flag.StringVar(&port, "port", "443", "tcp port to connect to") // TODO make uint
+	portPtr := flag.Uint("port", 443, "tcp port to connect to")
 	timeoutPtr := flag.Uint("timeout", 5, "tcp timeout in seconds")
 	flag.BoolVar(&verbose, "verbose", false, "verbose logging")
 	flag.UintVar(&maxDepth, "depth", 20, "maximum BFS depth to go")
@@ -53,7 +53,7 @@ func main() {
 
 	flag.Parse()
 	if flag.NArg() < 1 {
-		fmt.Fprintln(os.Stderr, "Pass at least one domain to scan")
+		fmt.Fprintln(os.Stderr, "Pass at least one host to scan")
 		flag.Usage()
 		return
 	}
@@ -62,6 +62,7 @@ func main() {
 		flag.Usage()
 		return
 	}
+	port = strconv.FormatUint(uint64(*portPtr), 10)
 	timeout = time.Duration(*timeoutPtr) * time.Second
 	startDomains := flag.Args()
 	for i := range startDomains {
@@ -145,7 +146,7 @@ func BFS(roots []string) {
 		threadPass <- true
 	}
 
-	for _, root := range roots { // TODO test
+	for _, root := range roots {
 		wg.Add(1)
 		domainChan <- &DomainNode{root, 0, nil}
 	}
