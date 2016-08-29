@@ -53,7 +53,6 @@ func main() {
 
 	flag.Parse()
 	if flag.NArg() < 1 {
-		fmt.Fprintln(os.Stderr, "Pass at least one host to scan")
 		flag.Usage()
 		return
 	}
