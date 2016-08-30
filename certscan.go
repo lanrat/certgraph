@@ -123,7 +123,7 @@ func directDomain(domain string) string {
 // prints the adjacency list in sorted order
 func printGraph() {
 	domains := make([]string, 0, len(domainGraph))
-	for domain, _ := range domainGraph {
+	for domain := range domainGraph {
 		domains = append(domains, domain)
 	}
 	sort.Strings(domains)
@@ -238,7 +238,7 @@ func BFSPeers(host string) []string {
 		}
 	}
 
-	for domain, _ := range domainMap {
+	for domain := range domainMap {
 		domains = append(domains, domain)
 	}
 	sort.Strings(domains)
