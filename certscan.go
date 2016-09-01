@@ -56,8 +56,8 @@ func main() {
 	flag.BoolVar(&verbose, "verbose", false, "verbose logging")
 	flag.UintVar(&maxDepth, "depth", 20, "maximum BFS depth to go")
 	flag.UintVar(&parallel, "parallel", 10, "number of certificates to retrieve in parallel")
-	flag.BoolVar(&starttls, "starttls", false, "Connect without TLS and then upgrade with STARTTLS for SMTP, useful with -port 25")
-	flag.BoolVar(&sortCerts, "sort", false, "Visit and print domains in sorted order")
+	flag.BoolVar(&starttls, "starttls", false, "connect without TLS and then upgrade with STARTTLS for SMTP, useful with -port 25")
+	flag.BoolVar(&sortCerts, "sort", false, "visit and print domains in sorted order")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s: [OPTION]... HOST...\n", os.Args[0])
 		flag.PrintDefaults()
