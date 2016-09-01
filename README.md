@@ -14,6 +14,12 @@ Usage of ./certscan: [OPTION]... HOST...
         number of certificates to retrieve in parallel (default 10)
   -port uint
         tcp port to connect to (default 443)
+  -save string
+        save certs to folder
+  -sort
+        visit and print domains in sorted order
+  -starttls
+        connect without TLS and then upgrade with STARTTLS for SMTP, useful with -port 25
   -timeout uint
         tcp timeout in seconds (default 5)
   -verbose

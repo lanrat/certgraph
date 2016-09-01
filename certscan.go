@@ -14,14 +14,31 @@ import (
 	"syscall"
 	"time"
 	"net/smtp"
+	"encoding/pem"
+	"path"
 )
 
 /* TODO
 follow http redirects
-save certs
 json output
-
 */
+
+// vars
+var conf = &tls.Config{InsecureSkipVerify: true}
+var markedDomains = make(map[string]bool)
+var domainGraph = make(map[string]*DomainNode)
+var depth uint
+var save bool
+
+// flags
+var port string
+var timeout time.Duration
+var verbose bool
+var maxDepth uint
+var parallel uint
+var starttls bool
+var sortCerts bool
+var savePath string
 
 // structure to store a domain and its edges
 type DomainNode struct {
@@ -32,23 +49,8 @@ type DomainNode struct {
 
 // get the string representation of a node
 func (d *DomainNode) String() string {
-	return fmt.Sprintf("%s %d %v", directDomain(d.Domain), d.Depth, *d.Neighbors)
+	return fmt.Sprintf("%s %d %v", d.Domain, d.Depth, *d.Neighbors)
 }
-
-// vars
-var conf = &tls.Config{InsecureSkipVerify: true}
-var markedDomains = make(map[string]bool)
-var domainGraph = make(map[string]*DomainNode)
-var depth uint
-
-// flags
-var port string
-var timeout time.Duration
-var verbose bool
-var maxDepth uint
-var parallel uint
-var starttls bool
-var sortCerts bool
 
 func main() {
 	portPtr := flag.Uint("port", 443, "tcp port to connect to")
@@ -58,6 +60,7 @@ func main() {
 	flag.UintVar(&parallel, "parallel", 10, "number of certificates to retrieve in parallel")
 	flag.BoolVar(&starttls, "starttls", false, "connect without TLS and then upgrade with STARTTLS for SMTP, useful with -port 25")
 	flag.BoolVar(&sortCerts, "sort", false, "visit and print domains in sorted order")
+	flag.StringVar(&savePath, "save", "", "save certs to folder")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s: [OPTION]... HOST...\n", os.Args[0])
 		flag.PrintDefaults()
@@ -78,6 +81,14 @@ func main() {
 	startDomains := flag.Args()
 	for i := range startDomains {
 		startDomains[i] = strings.ToLower(startDomains[i])
+	}
+	if len(savePath) > 0 {
+		save = true
+		err := os.MkdirAll(savePath, 0777)
+		if err != nil {
+			v(err)
+			return
+		}
 	}
 
 	BFS(startDomains)
@@ -162,7 +173,7 @@ func BFS(roots []string) {
 
 	for _, root := range roots {
 		wg.Add(1)
-		domainChan <- &DomainNode{root, 0, nil}
+		domainChan <- &DomainNode{directDomain(root), 0, nil}
 	}
 	go func() {
 		for {
@@ -178,9 +189,8 @@ func BFS(roots []string) {
 				depth = domainNode.Depth
 			}
 
-			dDomain := directDomain(domainNode.Domain)
-			if !markedDomains[dDomain] {
-				markedDomains[dDomain] = true
+			if !markedDomains[domainNode.Domain] {
+				markedDomains[domainNode.Domain] = true
 				go func(domainNode *DomainNode) {
 					defer wg.Done()
 					// wait for pass
@@ -188,14 +198,13 @@ func BFS(roots []string) {
 					defer func() { threadPass <- true }()
 
 					// do things
-					dDomain := directDomain(domainNode.Domain)
-					v("Visiting", domainNode.Depth, dDomain)
-					neighbors := BFSPeers(dDomain) // visit
+					v("Visiting", domainNode.Depth, domainNode.Domain)
+					neighbors := BFSPeers(domainNode.Domain) // visit
 					domainNode.Neighbors = &neighbors
 					domainGraphChan <- domainNode
 					for _, neighbor := range neighbors {
 						wg.Add(1)
-						domainChan <- &DomainNode{neighbor, domainNode.Depth + 1, nil}
+						domainChan <- &DomainNode{directDomain(neighbor), domainNode.Depth + 1, nil}
 					}
 				}(domainNode)
 			} else {
@@ -210,9 +219,8 @@ func BFS(roots []string) {
 		for {
 			domainNode, more := <-domainGraphChan
 			if more {
-				dDomain := directDomain(domainNode.Domain)
 				if sortCerts {
-					domainGraph[dDomain] = domainNode // not thread safe
+					domainGraph[domainNode.Domain] = domainNode // not thread safe
 				} else {
 					fmt.Println(domainNode)
 				}
@@ -232,6 +240,10 @@ func BFS(roots []string) {
 func BFSPeers(host string) []string {
 	domains := make([]string, 0)
 	certs := getPeerCerts(host)
+	if save && len(certs) > 0 {
+		// TODO move to own thread to reduce disk io?
+		certToPEMFile(certs, path.Join(savePath, host)+".pem")
+	}
 
 	if len(certs) == 0 {
 		return domains
@@ -303,5 +315,19 @@ func getPeerCerts(host string) (certs []*x509.Certificate) {
 		conn.Close()
 		connState := conn.ConnectionState()
 		return connState.PeerCertificates
+	}
+}
+
+
+// Function to convert certificats to PEM formate
+func certToPEMFile(certs []*x509.Certificate, file string) {
+	f, err := os.Create(file)
+	if err != nil {
+		v(err)
+		return
+	}
+	defer f.Close()
+	for _, cert := range certs {
+		pem.Encode(f, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
 	}
 }
