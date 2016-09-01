@@ -20,7 +20,6 @@ import (
 follow http redirects
 save certs
 json output
-sort flag
 
 */
 
@@ -29,6 +28,11 @@ type DomainNode struct {
 	Domain    string
 	Depth     uint
 	Neighbors *[]string
+}
+
+// get the string representation of a node
+func (d *DomainNode) String() string {
+	return fmt.Sprintf("%s %d %v", directDomain(d.Domain), d.Depth, *d.Neighbors)
 }
 
 // vars
@@ -44,6 +48,7 @@ var verbose bool
 var maxDepth uint
 var parallel uint
 var starttls bool
+var sortCerts bool
 
 func main() {
 	portPtr := flag.Uint("port", 443, "tcp port to connect to")
@@ -52,6 +57,7 @@ func main() {
 	flag.UintVar(&maxDepth, "depth", 20, "maximum BFS depth to go")
 	flag.UintVar(&parallel, "parallel", 10, "number of certificates to retrieve in parallel")
 	flag.BoolVar(&starttls, "starttls", false, "Connect without TLS and then upgrade with STARTTLS for SMTP, useful with -port 25")
+	flag.BoolVar(&sortCerts, "sort", false, "Visit and print domains in sorted order")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s: [OPTION]... HOST...\n", os.Args[0])
 		flag.PrintDefaults()
@@ -78,8 +84,11 @@ func main() {
 
 	v("Done...")
 
-	printGraph()
-	v("Found", len(domainGraph), "domains")
+	if sortCerts {
+		printSortedGraph()
+	}
+
+	v("Found", len(markedDomains), "domains")
 	v("Graph Depth:", depth)
 }
 
@@ -127,7 +136,7 @@ func directDomain(domain string) string {
 }
 
 // prints the adjacency list in sorted order
-func printGraph() {
+func printSortedGraph() {
 	domains := make([]string, 0, len(domainGraph))
 	for domain := range domainGraph {
 		domains = append(domains, domain)
@@ -135,7 +144,7 @@ func printGraph() {
 	sort.Strings(domains)
 
 	for _, domain := range domains {
-		fmt.Println(domain, domainGraph[domain].Depth, *domainGraph[domain].Neighbors)
+		fmt.Println(domainGraph[domain])
 	}
 }
 
@@ -202,7 +211,11 @@ func BFS(roots []string) {
 			domainNode, more := <-domainGraphChan
 			if more {
 				dDomain := directDomain(domainNode.Domain)
-				domainGraph[dDomain] = domainNode // not thread safe
+				if sortCerts {
+					domainGraph[dDomain] = domainNode // not thread safe
+				} else {
+					fmt.Println(domainNode)
+				}
 			} else {
 				done <- true
 				return
@@ -247,7 +260,9 @@ func BFSPeers(host string) []string {
 	for domain := range domainMap {
 		domains = append(domains, domain)
 	}
-	sort.Strings(domains)
+	if sortCerts {
+		sort.Strings(domains)
+	}
 	return domains
 
 }
