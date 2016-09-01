@@ -13,11 +13,15 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"net/smtp"
 )
 
 /* TODO
 follow http redirects
-starttls
+save certs
+json output
+sort flag
+
 */
 
 // structure to store a domain and its edges
@@ -39,6 +43,7 @@ var timeout time.Duration
 var verbose bool
 var maxDepth uint
 var parallel uint
+var starttls bool
 
 func main() {
 	portPtr := flag.Uint("port", 443, "tcp port to connect to")
@@ -46,6 +51,7 @@ func main() {
 	flag.BoolVar(&verbose, "verbose", false, "verbose logging")
 	flag.UintVar(&maxDepth, "depth", 20, "maximum BFS depth to go")
 	flag.UintVar(&parallel, "parallel", 10, "number of certificates to retrieve in parallel")
+	flag.BoolVar(&starttls, "starttls", false, "Connect without TLS and then upgrade with STARTTLS for SMTP, useful with -port 25")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s: [OPTION]... HOST...\n", os.Args[0])
 		flag.PrintDefaults()
@@ -247,15 +253,40 @@ func BFSPeers(host string) []string {
 }
 
 // gets the certificats found for a given domain
-func getPeerCerts(host string) []*x509.Certificate {
+func getPeerCerts(host string) (certs []*x509.Certificate) {
+	certs = make([]*x509.Certificate, 0)
 	addr := net.JoinHostPort(host, port)
 	dialer := &net.Dialer{Timeout: timeout}
-	conn, err := tls.DialWithDialer(dialer, "tcp", addr, conf)
-	if checkNetErr(err, host) {
-		return make([]*x509.Certificate, 0)
 
+	if starttls {
+		conn, err := dialer.Dial("tcp", addr)
+		if checkNetErr(err, host) {
+			return
+		}
+		defer conn.Close()
+		smtp, err := smtp.NewClient(conn, host)
+		if err != nil {
+			v(err)
+			return
+		}
+		err = smtp.StartTLS(conf)
+		if err != nil {
+			v(err)
+			return
+		}
+		connState, ok := smtp.TLSConnectionState()
+		if !ok {
+			return
+		}
+		return connState.PeerCertificates
+	} else {
+		conn, err := tls.DialWithDialer(dialer, "tcp", addr, conf)
+		if checkNetErr(err, host) {
+			return
+
+		}
+		conn.Close()
+		connState := conn.ConnectionState()
+		return connState.PeerCertificates
 	}
-	conn.Close()
-	connState := conn.ConnectionState()
-	return connState.PeerCertificates
 }
