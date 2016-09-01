@@ -60,7 +60,7 @@ func main() {
 	flag.UintVar(&parallel, "parallel", 10, "number of certificates to retrieve in parallel")
 	flag.BoolVar(&starttls, "starttls", false, "connect without TLS and then upgrade with STARTTLS for SMTP, useful with -port 25")
 	flag.BoolVar(&sortCerts, "sort", false, "visit and print domains in sorted order")
-	flag.StringVar(&savePath, "save", "", "save certs to folder")
+	flag.StringVar(&savePath, "save", "", "save certs to folder in PEM formate")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s: [OPTION]... HOST...\n", os.Args[0])
 		flag.PrintDefaults()

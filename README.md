@@ -15,7 +15,7 @@ Usage of ./certscan: [OPTION]... HOST...
   -port uint
         tcp port to connect to (default 443)
   -save string
-        save certs to folder
+        save certs to folder in PEM formate
   -sort
         visit and print domains in sorted order
   -starttls
