@@ -43,4 +43,6 @@ leez-dev-supporters.eff.org     3       Good    AC3933B1B95BA5254F43ADBE5E3E38E5
 micah-dev2-supporters.eff.org   3       Good    AC3933B1B95BA5254F43ADBE5E3E38E539C74456EE2D00493F0B2F38F991D54F        [max-dev-supporters.eff.org leez-dev-supporters.eff.org max-dev-www.eff.org micah-dev2-supporters.eff.org staging.eff.org]
 max-dev-supporters.eff.org      3       Good    AC3933B1B95BA5254F43ADBE5E3E38E539C74456EE2D00493F0B2F38F991D54F        [max-dev-supporters.eff.org leez-dev-supporters.eff.org max-dev-www.eff.org micah-dev2-supporters.eff.org staging.eff.org]
 max-dev-www.eff.org     3       Good    AC3933B1B95BA5254F43ADBE5E3E38E539C74456EE2D00493F0B2F38F991D54F        [max-dev-www.eff.org micah-dev2-supporters.eff.org staging.eff.org max-dev-supporters.eff.org leez-dev-supporters.eff.org]
+```
+The above output represents the adjacency list for the graph for the root domain `eff.org`. The adjacency list is in the form:
 `Node    Depth    Status    Cert-Fingerprint    [Edge1 Edge2 ... EdgeN]`
