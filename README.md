@@ -29,20 +29,18 @@ Usage of ./certscan: [OPTION]... HOST...
 ## Example
 ```
 $ ./certscan eff.org
-atlas.eff.org 1 [atlas.eff.org eff.org https-everywhere-atlas.eff.org httpse-atlas.eff.org kittens.eff.org maps.eff.org web6.eff.org]
-dev.eff.org 2 []
-eff.org 0 [atlas.eff.org eff.org https-everywhere-atlas.eff.org httpse-atlas.eff.org kittens.eff.org maps.eff.org web6.eff.org]
-https-everywhere-atlas.eff.org 1 [atlas.eff.org eff.org https-everywhere-atlas.eff.org httpse-atlas.eff.org kittens.eff.org maps.eff.org web6.eff.org]
-httpse-atlas.eff.org 1 [atlas.eff.org eff.org https-everywhere-atlas.eff.org httpse-atlas.eff.org kittens.eff.org maps.eff.org web6.eff.org]
-kittens.eff.org 1 [atlas.eff.org eff.org https-everywhere-atlas.eff.org httpse-atlas.eff.org kittens.eff.org maps.eff.org web6.eff.org]
-leez-dev-supporters.eff.org 3 [leez-dev-supporters.eff.org max-dev-supporters.eff.org max-dev-www.eff.org micah-dev2-supporters.eff.org staging.eff.org]
-maps.eff.org 1 [atlas.eff.org eff.org https-everywhere-atlas.eff.org httpse-atlas.eff.org kittens.eff.org maps.eff.org web6.eff.org]
-max-dev-supporters.eff.org 3 [leez-dev-supporters.eff.org max-dev-supporters.eff.org max-dev-www.eff.org micah-dev2-supporters.eff.org staging.eff.org]
-max-dev-www.eff.org 3 [leez-dev-supporters.eff.org max-dev-supporters.eff.org max-dev-www.eff.org micah-dev2-supporters.eff.org staging.eff.org]
-micah-dev2-supporters.eff.org 3 [leez-dev-supporters.eff.org max-dev-supporters.eff.org max-dev-www.eff.org micah-dev2-supporters.eff.org staging.eff.org]
-s.eff.org 2 [*.dev.eff.org *.eff.org *.s.eff.org *.staging.eff.org]
-staging.eff.org 2 [leez-dev-supporters.eff.org max-dev-supporters.eff.org max-dev-www.eff.org micah-dev2-supporters.eff.org staging.eff.org]
-web6.eff.org 1 [*.dev.eff.org *.eff.org *.s.eff.org *.staging.eff.org]
-```
-The above output represents the adjacency list for the graph for the root domain `eff.org`. The adjacency list is in the form:
-`node depth [edge1  edge2 ... edgeN]`
+eff.org 0       Good    5C699512FD8763FC50A105A14DB2526A10AE6EAC3E79F5F44A7F99E90189FBE5        [maps.eff.org web6.eff.org eff.org atlas.eff.org https-everywhere-atlas.eff.org httpse-atlas.eff.org kittens.eff.org]
+web6.eff.org    1       Good    AF842FA69A720E9FB2F37BAF723A20F80B8C2072693E55D0A1EA78C7BABE2699        [*.eff.org *.dev.eff.org *.s.eff.org *.staging.eff.org]
+https-everywhere-atlas.eff.org  1       Good    5C699512FD8763FC50A105A14DB2526A10AE6EAC3E79F5F44A7F99E90189FBE5        [kittens.eff.org maps.eff.org web6.eff.org eff.org atlas.eff.org https-everywhere-atlas.eff.org httpse-atlas.eff.org]
+maps.eff.org    1       Good    5C699512FD8763FC50A105A14DB2526A10AE6EAC3E79F5F44A7F99E90189FBE5        [maps.eff.org web6.eff.org eff.org atlas.eff.org https-everywhere-atlas.eff.org httpse-atlas.eff.org kittens.eff.org]
+atlas.eff.org   1       Good    5C699512FD8763FC50A105A14DB2526A10AE6EAC3E79F5F44A7F99E90189FBE5        [eff.org atlas.eff.org https-everywhere-atlas.eff.org httpse-atlas.eff.org kittens.eff.org maps.eff.org web6.eff.org]
+httpse-atlas.eff.org    1       Good    5C699512FD8763FC50A105A14DB2526A10AE6EAC3E79F5F44A7F99E90189FBE5        [eff.org atlas.eff.org https-everywhere-atlas.eff.org httpse-atlas.eff.org kittens.eff.org maps.eff.org web6.eff.org]
+kittens.eff.org 1       Good    5C699512FD8763FC50A105A14DB2526A10AE6EAC3E79F5F44A7F99E90189FBE5        [eff.org atlas.eff.org https-everywhere-atlas.eff.org httpse-atlas.eff.org kittens.eff.org maps.eff.org web6.eff.org]
+dev.eff.org     2       No Host         []
+s.eff.org       2       Good    AF842FA69A720E9FB2F37BAF723A20F80B8C2072693E55D0A1EA78C7BABE2699        [*.eff.org *.dev.eff.org *.s.eff.org *.staging.eff.org]
+staging.eff.org 2       Good    AC3933B1B95BA5254F43ADBE5E3E38E539C74456EE2D00493F0B2F38F991D54F        [max-dev-supporters.eff.org leez-dev-supporters.eff.org max-dev-www.eff.org micah-dev2-supporters.eff.org staging.eff.org]
+leez-dev-supporters.eff.org     3       Good    AC3933B1B95BA5254F43ADBE5E3E38E539C74456EE2D00493F0B2F38F991D54F        [staging.eff.org max-dev-supporters.eff.org leez-dev-supporters.eff.org max-dev-www.eff.org micah-dev2-supporters.eff.org]
+micah-dev2-supporters.eff.org   3       Good    AC3933B1B95BA5254F43ADBE5E3E38E539C74456EE2D00493F0B2F38F991D54F        [max-dev-supporters.eff.org leez-dev-supporters.eff.org max-dev-www.eff.org micah-dev2-supporters.eff.org staging.eff.org]
+max-dev-supporters.eff.org      3       Good    AC3933B1B95BA5254F43ADBE5E3E38E539C74456EE2D00493F0B2F38F991D54F        [max-dev-supporters.eff.org leez-dev-supporters.eff.org max-dev-www.eff.org micah-dev2-supporters.eff.org staging.eff.org]
+max-dev-www.eff.org     3       Good    AC3933B1B95BA5254F43ADBE5E3E38E539C74456EE2D00493F0B2F38F991D54F        [max-dev-www.eff.org micah-dev2-supporters.eff.org staging.eff.org max-dev-supporters.eff.org leez-dev-supporters.eff.org]
+`Node    Depth    Status    Cert-Fingerprint    [Edge1 Edge2 ... EdgeN]`

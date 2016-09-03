@@ -1,26 +1,28 @@
 package main
 
 import (
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"flag"
 	"fmt"
 	"net"
+	"net/smtp"
 	"os"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
-	"net/smtp"
-	"encoding/pem"
-	"path"
 )
 
 /* TODO
 follow http redirects
 json output
+cert chain
 */
 
 // vars
@@ -40,16 +42,57 @@ var starttls bool
 var sortCerts bool
 var savePath string
 
+// domain node conection status
+type domainStatus int
+
+const (
+	UNKNOWN = iota
+	GOOD    = iota
+	TIMEOUT = iota
+	NO_HOST = iota
+	REFUSED = iota
+	ERROR   = iota
+)
+
+// return domain status for printing
+func (status domainStatus) String() string {
+	switch status {
+	case UNKNOWN:
+		return "Unknown"
+	case GOOD:
+		return "Good"
+	case TIMEOUT:
+		return "Timeout"
+	case NO_HOST:
+		return "No Host"
+	case REFUSED:
+		return "Refused"
+	case ERROR:
+		return "Error"
+	}
+	return "?"
+}
+
 // structure to store a domain and its edges
 type DomainNode struct {
-	Domain    string
-	Depth     uint
-	Neighbors *[]string
+	Domain      string
+	Depth       uint
+	Fingerprint []byte
+	Neighbors   []string
+	Status      domainStatus
+}
+
+// constructor for DomainNode, converts domain to directDomain
+func NewDomainNode(domain string, depth uint) *DomainNode {
+	var node DomainNode
+	node.Domain = directDomain(domain)
+	node.Depth = depth
+	return &node
 }
 
 // get the string representation of a node
 func (d *DomainNode) String() string {
-	return fmt.Sprintf("%s %d %v", d.Domain, d.Depth, *d.Neighbors)
+	return fmt.Sprintf("%s\t%d\t%s\t%X\t%v", d.Domain, d.Depth, d.Status, d.Fingerprint, d.Neighbors)
 }
 
 func main() {
@@ -111,28 +154,26 @@ func v(a ...interface{}) {
 }
 
 // Check for errors, print if network related
-func checkNetErr(err error, domain string) bool {
+func checkNetErr(err error) domainStatus {
 	if err == nil {
-		return false
-
+		return GOOD
 	} else if netError, ok := err.(net.Error); ok && netError.Timeout() {
-		v("Timeout", domain)
+		return TIMEOUT
 	} else {
 		switch t := err.(type) {
 		case *net.OpError:
 			if t.Op == "dial" {
-				v("Unknown host", domain)
+				return NO_HOST
 			} else if t.Op == "read" {
-				v("Connection refused", domain)
+				return REFUSED
 			}
-
 		case syscall.Errno:
 			if t == syscall.ECONNREFUSED {
-				v("Connection refused", domain)
+				return REFUSED
 			}
 		}
 	}
-	return true
+	return ERROR
 }
 
 // given a domain returns the non-wildcard version of that domain
@@ -173,7 +214,7 @@ func BFS(roots []string) {
 
 	for _, root := range roots {
 		wg.Add(1)
-		domainChan <- &DomainNode{directDomain(root), 0, nil}
+		domainChan <- NewDomainNode(root, 0)
 	}
 	go func() {
 		for {
@@ -199,12 +240,11 @@ func BFS(roots []string) {
 
 					// do things
 					v("Visiting", domainNode.Depth, domainNode.Domain)
-					neighbors := BFSPeers(domainNode.Domain) // visit
-					domainNode.Neighbors = &neighbors
+					BFSPeers(domainNode) // visit
 					domainGraphChan <- domainNode
-					for _, neighbor := range neighbors {
+					for _, neighbor := range domainNode.Neighbors {
 						wg.Add(1)
-						domainChan <- &DomainNode{directDomain(neighbor), domainNode.Depth + 1, nil}
+						domainChan <- NewDomainNode(neighbor, domainNode.Depth+1)
 					}
 				}(domainNode)
 			} else {
@@ -236,58 +276,60 @@ func BFS(roots []string) {
 	<-done // wait for save to finish
 }
 
-// visit each node and get its neighbors
-func BFSPeers(host string) []string {
-	domains := make([]string, 0)
-	certs := getPeerCerts(host)
+// visit each node and get & set its neighbors
+func BFSPeers(node *DomainNode) {
+	var certs []*x509.Certificate
+	node.Status, certs = getPeerCerts(node.Domain)
 	if save && len(certs) > 0 {
 		// TODO move to own thread to reduce disk io?
-		certToPEMFile(certs, path.Join(savePath, host)+".pem")
+		certToPEMFile(certs, path.Join(savePath, node.Domain)+".pem")
 	}
 
 	if len(certs) == 0 {
-		return domains
+		return
 	}
 
 	// used to ensure uniq entries in domains array
 	domainMap := make(map[string]bool)
 
-	// add the CommonName just to be safe
 	if len(certs) > 0 {
+		// add the CommonName just to be safe
 		cn := strings.ToLower(certs[0].Subject.CommonName)
 		if len(cn) > 0 {
 			domainMap[cn] = true
 		}
-	}
-
-	for _, cert := range certs {
-		for _, domain := range cert.DNSNames {
+		// only bother looking at the first cert
+		for _, domain := range certs[0].DNSNames {
 			if len(domain) > 0 {
 				domain = strings.ToLower(domain)
 				domainMap[domain] = true
 			}
 		}
 	}
+	// cert fingerprint
+	h := sha256.New()
+	h.Write(certs[0].Raw)
+	node.Fingerprint = h.Sum(nil)
 
 	for domain := range domainMap {
-		domains = append(domains, domain)
+		node.Neighbors = append(node.Neighbors, domain)
 	}
 	if sortCerts {
-		sort.Strings(domains)
+		sort.Strings(node.Neighbors)
 	}
-	return domains
-
 }
 
 // gets the certificats found for a given domain
-func getPeerCerts(host string) (certs []*x509.Certificate) {
-	certs = make([]*x509.Certificate, 0)
+func getPeerCerts(host string) (dStatus domainStatus, certs []*x509.Certificate) {
 	addr := net.JoinHostPort(host, port)
 	dialer := &net.Dialer{Timeout: timeout}
+	dStatus = ERROR
 
 	if starttls {
 		conn, err := dialer.Dial("tcp", addr)
-		if checkNetErr(err, host) {
+		dStatus = checkNetErr(err)
+		if dStatus != GOOD {
+			v(dStatus, host)
 			return
 		}
 		defer conn.Close()
@@ -305,21 +347,22 @@ func getPeerCerts(host string) (certs []*x509.Certificate) {
 		if !ok {
 			return
 		}
-		return connState.PeerCertificates
+		return GOOD, connState.PeerCertificates
 	} else {
 		conn, err := tls.DialWithDialer(dialer, "tcp", addr, conf)
-		if checkNetErr(err, host) {
+		dStatus = checkNetErr(err)
+		if dStatus != GOOD {
+			v(dStatus, host)
 			return
 
 		}
 		conn.Close()
 		connState := conn.ConnectionState()
-		return connState.PeerCertificates
+		return GOOD, connState.PeerCertificates
 	}
 }
 
-
-// Function to convert certificats to PEM formate
+// function to convert certificats to PEM formate
 func certToPEMFile(certs []*x509.Certificate, file string) {
 	f, err := os.Create(file)
 	if err != nil {
