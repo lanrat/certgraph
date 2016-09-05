@@ -41,6 +41,7 @@ var parallel uint
 var starttls bool
 var sortCerts bool
 var savePath string
+var list bool
 
 // domain node conection status
 type domainStatus int
@@ -92,6 +93,9 @@ func NewDomainNode(domain string, depth uint) *DomainNode {
 
 // get the string representation of a node
 func (d *DomainNode) String() string {
+	if list {
+		return fmt.Sprintf("%s", d.Domain)
+	}
 	return fmt.Sprintf("%s\t%d\t%s\t%X\t%v", d.Domain, d.Depth, d.Status, d.Fingerprint, d.Neighbors)
 }
 
@@ -103,6 +107,7 @@ func main() {
 	flag.UintVar(&parallel, "parallel", 10, "number of certificates to retrieve in parallel")
 	flag.BoolVar(&starttls, "starttls", false, "connect without TLS and then upgrade with STARTTLS for SMTP, useful with -port 25")
 	flag.BoolVar(&sortCerts, "sort", false, "visit and print domains in sorted order")
+	flag.BoolVar(&list, "list", false, "only print the domains found and not the entire graph")
 	flag.StringVar(&savePath, "save", "", "save certs to folder in PEM formate")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s: [OPTION]... HOST...\n", os.Args[0])
