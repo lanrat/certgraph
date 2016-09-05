@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net"
@@ -21,7 +22,6 @@ import (
 
 /* TODO
 follow http redirects
-json output
 cert chain
 */
 
@@ -42,6 +42,7 @@ var starttls bool
 var sortCerts bool
 var savePath string
 var list bool
+var printJSON bool
 
 // domain node conection status
 type domainStatus int
@@ -77,7 +78,7 @@ func (status domainStatus) String() string {
 // structure to store a domain and its edges
 type DomainNode struct {
 	Domain      string
-	Depth       uint
+	Depth       uint `json:"-"`
 	Fingerprint []byte
 	Neighbors   []string
 	Status      domainStatus
@@ -108,6 +109,7 @@ func main() {
 	flag.BoolVar(&starttls, "starttls", false, "connect without TLS and then upgrade with STARTTLS for SMTP, useful with -port 25")
 	flag.BoolVar(&sortCerts, "sort", false, "visit and print domains in sorted order")
 	flag.BoolVar(&list, "list", false, "only print the domains found and not the entire graph")
+	flag.BoolVar(&printJSON, "json", false, "print the graph as json")
 	flag.StringVar(&savePath, "save", "", "save certs to folder in PEM formate")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s: [OPTION]... HOST...\n", os.Args[0])
@@ -115,6 +117,10 @@ func main() {
 	}
 
 	flag.Parse()
+	if printJSON {
+		// these arguments conflict
+		sortCerts = true
+	}
 	if flag.NArg() < 1 {
 		flag.Usage()
 		return
@@ -141,9 +147,9 @@ func main() {
 
 	BFS(startDomains)
 
-	v("Done...")
-
-	if sortCerts {
+	if printJSON {
+		printJSONGraph()
+	} else if sortCerts {
 		printSortedGraph()
 	}
 
@@ -190,6 +196,16 @@ func directDomain(domain string) string {
 		domain = domain[2:]
 	}
 	return domain
+}
+
+// prnts the graph as a json object
+func printJSONGraph() {
+	j, err := json.Marshal(domainGraph)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Println(string(j))
 }
 
 // prints the adjacency list in sorted order
