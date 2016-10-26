@@ -89,7 +89,7 @@ type DomainNode struct {
 	Fingerprint fingerprint
 	Neighbors   []string
 	Status      domainStatus
-	Root 		bool
+	Root        bool
 }
 
 // constructor for DomainNode, converts domain to directDomain
@@ -211,8 +211,8 @@ func printJSONGraph() {
 	// TODO remove the need for all these temp vars
 	//domains := make(map[string]map[string]string)
 	certs := make(map[string]bool)
-	nodes := make([]map[string]string, 0, 2 * len(domainGraph))
-	links := make([]map[string]string, 0, 2 * len(domainGraph))
+	nodes := make([]map[string]string, 0, 2*len(domainGraph))
+	links := make([]map[string]string, 0, 2*len(domainGraph))
 
 	for domain := range domainGraph {
 		fp := domainGraph[domain].Fingerprint.Hex()
@@ -222,7 +222,7 @@ func printJSONGraph() {
 		dnode["type"] = "domain"
 		dnode["id"] = domain
 		dnode["status"] = domainGraph[domain].Status.String()
-		dnode["root"] = strconv.FormatBool(domainGraph[domain].Root);
+		dnode["root"] = strconv.FormatBool(domainGraph[domain].Root)
 		nodes = append(nodes, dnode)
 
 		// add domain -> cert
