@@ -244,7 +244,6 @@ func printJSONGraph() {
 			for _, neighbor := range domainGraph[domain].Neighbors {
 				links = append(links, map[string]string{"source": fp, "target": directDomain(neighbor), "type": "sans"})
 			}
-
 		}
 	}
 
@@ -252,6 +251,7 @@ func printJSONGraph() {
 	jsonGraph["nodes"] = nodes
 	jsonGraph["links"] = links
 
+	// TODO toggle this with flag
 	//j, err := json.Marshal(jsonGraph)
 	j, err := json.MarshalIndent(jsonGraph, "", "\t")
 	if err != nil {
@@ -430,7 +430,6 @@ func getPeerCerts(host string) (dStatus domainStatus, certs []*x509.Certificate)
 		if dStatus != GOOD {
 			v(dStatus, host)
 			return
-
 		}
 		conn.Close()
 		connState := conn.ConnectionState()
