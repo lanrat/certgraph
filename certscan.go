@@ -4,8 +4,8 @@ import (
 	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/pem"
 	"encoding/json"
+	"encoding/pem"
 	"flag"
 	"fmt"
 	"net"
@@ -56,6 +56,13 @@ const (
 	ERROR   = iota
 )
 
+type fingerprint []byte
+
+func (fp fingerprint) Hex() string {
+	return fmt.Sprintf("%X", fp)
+	//return "a"
+}
+
 // return domain status for printing
 func (status domainStatus) String() string {
 	switch status {
@@ -78,10 +85,11 @@ func (status domainStatus) String() string {
 // structure to store a domain and its edges
 type DomainNode struct {
 	Domain      string
-	Depth       uint `json:"-"`
-	Fingerprint []byte
+	Depth       uint
+	Fingerprint fingerprint
 	Neighbors   []string
 	Status      domainStatus
+	Root 		bool
 }
 
 // constructor for DomainNode, converts domain to directDomain
@@ -97,7 +105,7 @@ func (d *DomainNode) String() string {
 	if list {
 		return fmt.Sprintf("%s", d.Domain)
 	}
-	return fmt.Sprintf("%s\t%d\t%s\t%X\t%v", d.Domain, d.Depth, d.Status, d.Fingerprint, d.Neighbors)
+	return fmt.Sprintf("%s\t%d\t%s\t%s\t%v", d.Domain, d.Depth, d.Status, d.Fingerprint.Hex(), d.Neighbors)
 }
 
 func main() {
@@ -200,7 +208,52 @@ func directDomain(domain string) string {
 
 // prnts the graph as a json object
 func printJSONGraph() {
-	j, err := json.Marshal(domainGraph)
+	// TODO remove the need for all these temp vars
+	//domains := make(map[string]map[string]string)
+	certs := make(map[string]bool)
+	nodes := make([]map[string]string, 0, 2 * len(domainGraph))
+	links := make([]map[string]string, 0, 2 * len(domainGraph))
+
+	for domain := range domainGraph {
+		fp := domainGraph[domain].Fingerprint.Hex()
+
+		// add domain node
+		dnode := make(map[string]string)
+		dnode["type"] = "domain"
+		dnode["id"] = domain
+		dnode["status"] = domainGraph[domain].Status.String()
+		dnode["root"] = strconv.FormatBool(domainGraph[domain].Root);
+		nodes = append(nodes, dnode)
+
+		// add domain -> cert
+		if fp != "" {
+			links = append(links, map[string]string{"source": domain, "target": fp, "type": "uses"})
+		}
+
+		// check cert
+		if !certs[fp] && fp != "" {
+			certs[fp] = true
+
+			// add cert node
+			cnode := make(map[string]string)
+			cnode["type"] = "certificate"
+			cnode["id"] = fp
+			nodes = append(nodes, cnode)
+
+			// add cert -> domains
+			for _, neighbor := range domainGraph[domain].Neighbors {
+				links = append(links, map[string]string{"source": fp, "target": directDomain(neighbor), "type": "sans"})
+			}
+
+		}
+	}
+
+	jsonGraph := make(map[string][]map[string]string)
+	jsonGraph["nodes"] = nodes
+	jsonGraph["links"] = links
+
+	//j, err := json.Marshal(jsonGraph)
+	j, err := json.MarshalIndent(jsonGraph, "", "\t")
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -235,7 +288,9 @@ func BFS(roots []string) {
 
 	for _, root := range roots {
 		wg.Add(1)
-		domainChan <- NewDomainNode(root, 0)
+		n := NewDomainNode(root, 0)
+		n.Root = true
+		domainChan <- n
 	}
 	go func() {
 		for {
