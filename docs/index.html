@@ -43,7 +43,7 @@
           <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Data <span class="caret"></span></a>
           <ul class="dropdown-menu" role="menu">
             <li><a href="#" data-toggle="modal" data-target="#URLmodal">URL</a></li>
-            <li><a href="#">Paste</a></li>
+            <li><a href="#" data-toggle="modal" data-target="#Pastemodal">Paste</a></li>
             <li><a href="#">File Upload</a></li>
           </ul>
         </li>
@@ -114,30 +114,51 @@
 </div>
 </footer>
 
-
-  <!-- Modal -->
-  <div class="modal fade" id="URLmodal" role="dialog">
-    <div class="modal-dialog">
-    
-      <!-- Modal content-->
-      <div class="modal-content">
-        <div class="modal-header">
-          <button type="button" class="close" data-dismiss="modal">&times;</button>
-          <h4 class="modal-title">Data URL</h4>
-        </div>
-        <div class="modal-body">
-            
-  <span class="input-group-addon">URL</span>
-  <input type="text" name="url" id="url-data" class="form-control" placeholder="eff.json">
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-primary" data-dismiss="modal" id="url-load">Load</button>
-          <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+<!-- URL Modal -->
+<div class="modal fade" id="URLmodal" role="dialog">
+  <div class="modal-dialog">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">Data URL</h4>
+      </div>
+      <div class="modal-body">
+        <label for="inputURL" class="col-lg-2 control-label">URL</label>
+        <div class="col-lg-10">
+          <input type="text" class="form-control" id="inputURL" placeholder="https://domain.com/data.json">
         </div>
       </div>
-      
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-dismiss="modal" id="loadURL">Load</button>
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+      </div>
     </div>
   </div>
+</div> <!-- /URL Modal -->
+
+<!-- Paste Modal -->
+<div class="modal fade" id="Pastemodal" role="dialog">
+  <div class="modal-dialog">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">JSON Data</h4>
+      </div>
+      <div class="modal-body">
+        <label for="inputPaste" class="col-lg-2 control-label">URL</label>
+        <div class="col-lg-10">
+          <textarea class="form-control" rows="10" id="inputPaste"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-dismiss="modal" id="loadPaste">Load</button>
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div> <!-- /Paste Modal -->
 
 </div> <!-- /container-->
 <script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
@@ -155,12 +176,8 @@ var width = svgElem.width.animVal.value,
 console.log(width, height);*/
 
 
-// tODO 
-// THIS
+// TODO THIS
 // http://www.coppelia.io/2014/07/an-a-to-z-of-extra-features-for-the-d3-force-layout/
-//
-//
-//
 
 var color = d3.scaleOrdinal(d3.schemeCategory10);
 var simulation;
@@ -180,7 +197,7 @@ svg.append("defs").append("marker")
   .append("svg:path")
   .attr("d", "M0,-5L10,0L0,5");
 
-function newGraph(src) {
+function resetGraph() {
   d3.select("g").selectAll("*").remove();
   createTables();
 
@@ -188,9 +205,7 @@ function newGraph(src) {
   simulation = d3.forceSimulation()
     .force("link", d3.forceLink().id(function(d) { return d.id; }))
     .force("charge", d3.forceManyBody().strength(-100))
-    .force("center", d3.forceCenter(width / 2, height / 2));
-
-  d3.json(src, createGraph );  
+    .force("center", d3.forceCenter(width / 2, height / 2)); 
 }
 
 function createGraph (error, graph) {
@@ -228,8 +243,8 @@ function createGraph (error, graph) {
           .on("end", dragended));
 
   node.on("click",function(d){
-    console.log("clicked", d.id);
-    console.log(d);
+    // console.log("clicked", d.id);
+    // console.log(d);
     updateInfoBox(d);
   });
 
@@ -366,20 +381,33 @@ function getQueryVariable(variable){
 }
 
 // new data from url
-d3.select("#url-load").on("click", loadURL);
+d3.select("#loadURL").on("click", loadURL);
 function loadURL(){
-  var url = document.getElementById("url-data").value;
+  var url = document.getElementById("inputURL").value;
   history.pushState('', 'CertGraph', "?data="+url);
-  newGraph(url);
+  resetGraph();
+  d3.json(url, createGraph); 
+};
+
+// new data from paste
+d3.select("#loadPaste").on("click", loadPaste);
+function loadPaste(){
+  var dataStr = document.getElementById("inputPaste").value;
+  history.pushState('', 'CertGraph', "?");
+  resetGraph();
+  var data = JSON.parse(dataStr);
+  createGraph(null, data);
 };
 
 
 // load initial graph data
 var dataURL = getQueryVariable("data");
 if (dataURL == "") {
+  // default graph
   dataURL = "https://gist.githubusercontent.com/lanrat/8187d01793bf3e578d76495182654206/raw/c49741b5206d81935febdf563452cc4346381e52/eff.json";
 }
-newGraph(dataURL);
+resetGraph();
+d3.json(dataURL, createGraph); 
 </script>
 
 </body>
