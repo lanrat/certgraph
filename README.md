@@ -1,13 +1,13 @@
-# CertScan
+# CertGraph
 ### A tool to crawl the graph of certificate Alternate Names
 
-CertScan crawls SSL certificates creating a directed graph where each domain is a node and the certificate alternative names for that domain's certificate are the edges to other domain nodes. Upon completion the Graph's adjacency list is printed.
+CertGraph crawls SSL certificates creating a directed graph where each domain is a node and the certificate alternative names for that domain's certificate are the edges to other domain nodes. Upon completion the Graph's adjacency list is printed.
 
 This tool was designed to be used for host name enumeration via SSL certificates, but it can also show you a "chain" of trust between domains and the certificates that re used between them.
 
 ## Usage
 ```
-Usage of ./certscan: [OPTION]... HOST...
+Usage of ./certgraph: [OPTION]... HOST...
   -depth uint
         maximum BFS depth to go (default 20)
   -parallel uint
@@ -28,7 +28,7 @@ Usage of ./certscan: [OPTION]... HOST...
 
 ## Example
 ```
-$ ./certscan eff.org
+$ ./certgraph eff.org
 eff.org 0       Good    5C699512FD8763FC50A105A14DB2526A10AE6EAC3E79F5F44A7F99E90189FBE5        [maps.eff.org web6.eff.org eff.org atlas.eff.org https-everywhere-atlas.eff.org httpse-atlas.eff.org kittens.eff.org]
 web6.eff.org    1       Good    AF842FA69A720E9FB2F37BAF723A20F80B8C2072693E55D0A1EA78C7BABE2699        [*.eff.org *.dev.eff.org *.s.eff.org *.staging.eff.org]
 https-everywhere-atlas.eff.org  1       Good    5C699512FD8763FC50A105A14DB2526A10AE6EAC3E79F5F44A7F99E90189FBE5        [kittens.eff.org maps.eff.org web6.eff.org eff.org atlas.eff.org https-everywhere-atlas.eff.org httpse-atlas.eff.org]
