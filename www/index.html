@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CertScan Graph</title>
+<link href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/cerulean/bootstrap.min.css" rel="stylesheet" integrity="sha384-zF4BRsG/fLiTGfR9QL82DrilZxrwgY/+du4p/c7J72zZj+FLYq4zY00RylP9ZjiT" crossorigin="anonymous">
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<style type="text/css">
+
+/** {
+  padding: 0;
+  margin: 0;
+  border-width: 0;
+}*/
+
+.links line {
+  stroke-opacity: 0.6;
+  stroke-width: 1px;
+  fill: none;
+}
+
+.nodes circle {
+  stroke: #333;
+  stroke-width: 1.5px;
+}
+body {
+    /*background-color: green;*/
+}
+
+/*html, body, svg {
+  width: 100%;
+  height: 100%;
+}*/
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<nav class="navbar navbar-inverse">
+    <div class="container-fluid">
+        <div class="navbar-header">
+            <!--<button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>-->
+            <a class="navbar-brand" href="#">CertScan</a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+            <ul class="nav navbar-nav">
+                <li><a href="#">Graph</a></li>
+            </ul>
+            <ul class="nav navbar-nav navbar-right">
+                 <li class="dropdown">
+          <a href="#" class="dropdown-toggle" data-toggle="dropdown" role="button" aria-expanded="false">Data <span class="caret"></span></a>
+          <ul class="dropdown-menu" role="menu">
+            <li><a href="#" data-toggle="modal" data-target="#URLmodal">URL</a></li>
+            <li><a href="#">Paste</a></li>
+            <li><a href="#">File Upload</a></li>
+          </ul>
+        </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<div class="panel panel-info">
+  <div class="panel-heading">
+    <h3 class="panel-title pull-left">Graph</h3>
+    <div class="pull-right"><a href="#" class="btn btn-primary btn-xs" id="generate">Download SVG</a></div>
+    <div class="clearfix"></div>
+  </div>
+    <svg id="graph" width="100%" height="500"></svg>
+</div>
+
+
+<div class="panel panel-info">
+  <div class="panel-heading">Info</div>
+  <div class="panel-body" id="node-info">
+    Click on a node in the graph to view details.
+  </div>
+</div>
+
+<ul class="nav nav-tabs">
+  <li class="active"><a href="#domains" data-toggle="tab" aria-expanded="false">Domains</a></li>
+  <li class=""><a href="#certificates" data-toggle="tab" aria-expanded="true">Certificates</a></li>
+</ul>
+<div id="myTabContent" class="tab-content panel-body">
+  <div class="tab-pane fade active in" id="domains">
+    
+<table class="table table-striped table-hover ">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Domain</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody id="domain-list">
+  </tbody>
+</table> 
+
+  </div>
+  <div class="tab-pane fade" id="certificates">
+    
+<table class="table table-striped table-hover ">
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Hash</th>
+    </tr>
+  </thead>
+  <tbody id="cert-list">
+  </tbody>
+</table> 
+
+  </div>
+
+</div>
+
+
+<footer>
+<hr>
+<div class="row">
+    <div class="col-xs-10"><a href="https://github.com/lanrat/certscan">CertScan</a></div>
+</div>
+</footer>
+
+
+  <!-- Modal -->
+  <div class="modal fade" id="URLmodal" role="dialog">
+    <div class="modal-dialog">
+    
+      <!-- Modal content-->
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal">&times;</button>
+          <h4 class="modal-title">Data URL</h4>
+        </div>
+        <div class="modal-body">
+            
+  <span class="input-group-addon">URL</span>
+  <input type="text" name="url" id="url-data" class="form-control" placeholder="eff.json">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-primary" data-dismiss="modal" id="url-load">Load</button>
+          <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+
+</div> <!-- /container-->
+<script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
+<script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
+<script src="//cdn.rawgit.com/eligrey/FileSaver.js/e9d941381475b5df8b7d7691013401e171014e89/FileSaver.min.js"></script>
+<script>
+var svg = d3.select("svg");
+var width = window.innerWidth-100;
+//var width = svg.attr("width");
+var height = svg.attr("height");
+
+/*var svgElem = document.getElementById("graph");
+var width = svgElem.width.animVal.value,
+    height = svgElem.height.animVal.value;
+console.log(width, height);*/
+
+
+// tODO 
+// THIS
+// http://www.coppelia.io/2014/07/an-a-to-z-of-extra-features-for-the-d3-force-layout/
+//
+//
+//
+
+var color = d3.scaleOrdinal(d3.schemeCategory10);
+var simulation;
+
+
+svg = svg.call(d3.zoom().on("zoom", zoomed)).append("g");
+
+svg.append("defs").append("marker")
+  .attr("id", "arrow")
+  .attr("viewBox", "0 -5 10 10")
+  .attr("refX", 20)
+  .attr("refY", 0)
+  .attr("markerWidth", 8)
+  .attr("markerHeight", 8)
+  .attr("orient", "auto")
+  //.attr("stroke", function(d) { return color(d.type); })
+  .append("svg:path")
+  .attr("d", "M0,-5L10,0L0,5");
+
+function newGraph(src) {
+  d3.select("g").selectAll("*").remove();
+  createTables();
+
+  // redo layout
+  simulation = d3.forceSimulation()
+    .force("link", d3.forceLink().id(function(d) { return d.id; }))
+    .force("charge", d3.forceManyBody().strength(-100))
+    .force("center", d3.forceCenter(width / 2, height / 2));
+
+  d3.json(src, createGraph );  
+}
+
+function createGraph (error, graph) {
+  if (error) throw error;
+
+  var link = svg.append("g")
+      .attr("class", "links")
+    .selectAll("line")
+    .data(graph.links)
+    .enter().append("line")
+      .attr("stroke", function(d) { return color(d.type); })
+       .attr("marker-end", "url(#arrow)");
+
+  var text = svg.append("g").attr("class", "labels").selectAll("g")
+    .data(graph.nodes)
+  .enter().append("g");
+
+  text.append("text")
+    .attr("x", 14)
+    .attr("y", ".31em")
+    .style("font-family", "sans-serif")
+    .style("font-size", "0.7em")
+    .text(function(d) { if (d.type == "domain") {return d.id; } return d.id.substring(0,8); });
+
+  var node = svg.append("g")
+      .attr("class", "nodes")
+    .selectAll("circle")
+    .data(graph.nodes)
+    .enter().append("circle")
+      .attr("r", 10)
+      .attr("fill", function(d) { if (d.root == "true") return color(d.root); return color(d.type); })
+      .call(d3.drag()
+          .on("start", dragstarted)
+          .on("drag", dragged)
+          .on("end", dragended));
+
+  node.on("click",function(d){
+    console.log("clicked", d.id);
+    console.log(d);
+    updateInfoBox(d);
+  });
+
+
+  node.append("title")
+      .text(function(d) { return d.id; });
+
+  simulation
+      .nodes(graph.nodes)
+      .on("tick", ticked);
+
+  simulation.force("link")
+      .links(graph.links);
+
+
+  function ticked() {
+    link
+        .attr("x1", function(d) { return d.source.x; })
+        .attr("y1", function(d) { return d.source.y; })
+        .attr("x2", function(d) { return d.target.x; })
+        .attr("y2", function(d) { return d.target.y; });
+
+    node
+        .attr("cx", function(d) { return d.x; })
+        .attr("cy", function(d) { return d.y; });
+    text
+        .attr("transform", function(d) { return "translate(" + d.x + "," + d.y + ")"});
+  }
+  createTables();
+}
+
+
+function dragstarted(d) {
+  if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+  d.fx = d.x;
+  d.fy = d.y;
+}
+
+function dragged(d) {
+  d.fx = d3.event.x;
+  d.fy = d3.event.y;
+}
+
+function dragended(d) {
+  if (!d3.event.active) simulation.alphaTarget(0);
+  d.fx = null;
+  d.fy = null;
+}
+
+function zoomed() {
+  svg.attr("transform", "translate(" + d3.event.transform.x + "," + d3.event.transform.y + ")" + " scale(" + d3.event.transform.k + ")");
+}
+
+d3.select("#generate").on("click", writeDownloadLink);
+function writeDownloadLink(){
+    try {
+        var isFileSaverSupported = !!new Blob();
+    } catch (e) {
+        alert("blob not supported");
+    }
+
+    var html = d3.select("svg")
+        .attr("title", "graph") //TODO
+        .attr("version", 1.1)
+        .attr("xmlns", "http://www.w3.org/2000/svg")
+        .node().outerHTML;
+
+    var blob = new Blob([html], {type: "image/svg+xml"});
+    saveAs(blob, "certificate_graph.svg"); //TODO root node name
+};
+
+function updateInfoBox(d) {
+  if (d) {
+    var el = document.getElementById("node-info");
+    var s = "Type: "+d.type+"\n";
+    if (d.type == "domain") {
+      s = s + "Domain: "+d.id+"\n";
+      s = s + "Status: "+d.status+"\n";
+    }else if (d.type = "certificate") {
+      s = s + "Hash: "+d.id+"\n";
+    }
+    el.innerText = s;
+  }
+}
+
+function createTables() {
+  // TODO: redo this in native d3
+  domainEl = document.getElementById("domain-list");
+  domain_tbody2 = document.createElement('tbody');
+  domain_tbody2.id="domain-list";
+  domainEl.parentNode.replaceChild(domain_tbody2, domainEl);
+
+  certEl = document.getElementById("cert-list");
+  cert_tbody2 = document.createElement('tbody');
+  cert_tbody2.id="cert-list";
+  certEl.parentNode.replaceChild(cert_tbody2, certEl);
+
+  var domainCount = 0;
+  function addTableDomain(d) {
+    //console.log("domain", d);
+    var c = "";
+    if (d.root == "true") {
+      c = "info";
+    }
+    $('#domain-list').append('<tr class="'+c+'"><td>'+ ++domainCount +'</td><td><a target="_blank" href="https://'+d.id+'">'+d.id+'</a></td><td>'+d.status+'</td></tr>');
+  }
+
+  var certCount = 0;
+  function addTableCert(d) {
+    //console.log("cert", d);
+    $('#cert-list').append('<tr><td>'+ ++certCount + '</td><td><a target="_blank" href="https://crt.sh/?q='+d.id+'">'+d.id+'</a></td></tr>');
+  }
+
+
+  d3.selectAll('circle').each(function(d){
+    if (d.type == "domain") {
+      addTableDomain(d);
+    }else if (d.type == "certificate") {
+      addTableCert(d);
+    } else {
+      console.log("Unknown Type: ", d.type);
+    }
+  })
+}
+
+// new data from url
+d3.select("#url-load").on("click", loadURL);
+function loadURL(){
+  var url = document.getElementById("url-data").value;
+  newGraph(url);
+};
+
+newGraph("eff.json");
+</script>
+
+</body>
+</html>
