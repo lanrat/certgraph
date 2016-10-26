@@ -8,31 +8,15 @@
 <link href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/cerulean/bootstrap.min.css" rel="stylesheet" integrity="sha384-zF4BRsG/fLiTGfR9QL82DrilZxrwgY/+du4p/c7J72zZj+FLYq4zY00RylP9ZjiT" crossorigin="anonymous">
 <script src="https://d3js.org/d3.v4.min.js"></script>
 <style type="text/css">
-
-/** {
-  padding: 0;
-  margin: 0;
-  border-width: 0;
-}*/
-
 .links line {
   stroke-opacity: 0.6;
   stroke-width: 1px;
   fill: none;
 }
-
 .nodes circle {
   stroke: #333;
   stroke-width: 1.5px;
 }
-body {
-    /*background-color: green;*/
-}
-
-/*html, body, svg {
-  width: 100%;
-  height: 100%;
-}*/
 </style>
 </head>
 
@@ -371,14 +355,31 @@ function createTables() {
   })
 }
 
+function getQueryVariable(variable){
+  var query = window.location.search.substring(1);
+  var vars = query.split("&");
+  for (var i=0;i<vars.length;i++) {
+    var pair = vars[i].split("=");
+    if(pair[0] == variable){return pair[1];}
+  }
+  return "";
+}
+
 // new data from url
 d3.select("#url-load").on("click", loadURL);
 function loadURL(){
   var url = document.getElementById("url-data").value;
+  history.pushState('', 'CertGraph', "?data="+url);
   newGraph(url);
 };
 
-newGraph("https://gist.githubusercontent.com/lanrat/8187d01793bf3e578d76495182654206/raw/c49741b5206d81935febdf563452cc4346381e52/eff.json");
+
+// load initial graph data
+var dataURL = getQueryVariable("data");
+if (dataURL == "") {
+  dataURL = "https://gist.githubusercontent.com/lanrat/8187d01793bf3e578d76495182654206/raw/c49741b5206d81935febdf563452cc4346381e52/eff.json";
+}
+newGraph(dataURL);
 </script>
 
 </body>
