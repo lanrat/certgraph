@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CertScan Graph</title>
+<title>CertGraph</title>
 <link href="https://maxcdn.bootstrapcdn.com/bootswatch/3.3.7/cerulean/bootstrap.min.css" rel="stylesheet" integrity="sha384-zF4BRsG/fLiTGfR9QL82DrilZxrwgY/+du4p/c7J72zZj+FLYq4zY00RylP9ZjiT" crossorigin="anonymous">
 <script src="https://d3js.org/d3.v4.min.js"></script>
 <style type="text/css">
@@ -48,11 +48,11 @@ body {
                 <span class="icon-bar"></span>
                 <span class="icon-bar"></span>
             </button>-->
-            <a class="navbar-brand" href="#">CertScan</a>
+            <a class="navbar-brand" href="#">CertGraph</a>
         </div>
         <div id="navbar" class="navbar-collapse collapse">
             <ul class="nav navbar-nav">
-                <li><a href="#">Graph</a></li>
+                <!-- <li><a href="#">Graph</a></li> -->
             </ul>
             <ul class="nav navbar-nav navbar-right">
                  <li class="dropdown">
@@ -126,7 +126,7 @@ body {
 <footer>
 <hr>
 <div class="row">
-    <div class="col-xs-10"><a href="https://github.com/lanrat/certscan">CertScan</a></div>
+    <div class="col-xs-10"><a href="https://github.com/lanrat/certgraph">CertGraph</a></div>
 </div>
 </footer>
 
@@ -378,7 +378,7 @@ function loadURL(){
   newGraph(url);
 };
 
-newGraph("eff.json");
+newGraph("https://gist.githubusercontent.com/lanrat/8187d01793bf3e578d76495182654206/raw/c49741b5206d81935febdf563452cc4346381e52/eff.json");
 </script>
 
 </body>

@@ -1,6 +1,6 @@
-all: certscan
+all: certgraph
 
-certscan: certscan.go
+certgraph: certgraph.go
 	go build -o $@ $^
 
 fmt:
