@@ -10,6 +10,10 @@ This tool was designed to be used for host name enumeration via SSL certificates
 Usage of ./certgraph: [OPTION]... HOST...
   -depth uint
         maximum BFS depth to go (default 20)
+  -json
+        print the graph as json
+  -list
+        only print the domains found and not the entire graph
   -parallel uint
         number of certificates to retrieve in parallel (default 10)
   -port uint
@@ -46,3 +50,19 @@ max-dev-www.eff.org     3       Good    AC3933B1B95BA5254F43ADBE5E3E38E539C74456
 ```
 The above output represents the adjacency list for the graph for the root domain `eff.org`. The adjacency list is in the form:
 `Node    Depth    Status    Cert-Fingerprint    [Edge1 Edge2 ... EdgeN]`
+
+
+## [Web UI](https://lanrat.github.io/certgraph/)
+
+A web UI is provided in the docs folder and is accessable at the github pages url [https://lanrat.github.io/certgraph/](https://lanrat.github.io/certgraph/).
+
+The web UI takes the putput provided with teh `-json` flag.
+The JSON graph can be sent to the web interface as an uploaded file, remote URL, or as the query string using the data variable.
+
+### [Example 1: eff.org](https://lanrat.github.io/certgraph/?data=https://gist.githubusercontent.com/lanrat/8187d01793bf3e578d76495182654206/raw/c49741b5206d81935febdf563452cc4346381e52/eff.json)
+
+[![eff.org graph](https://cloud.githubusercontent.com/assets/164192/19752800/d9aabfb0-9bb4-11e6-8c79-fb0c40d30e0b.png)](https://lanrat.github.io/certgraph/?data=https://gist.githubusercontent.com/lanrat/8187d01793bf3e578d76495182654206/raw/c49741b5206d81935febdf563452cc4346381e52/eff.json)
+
+### [Example 2: google.com](https://lanrat.github.io/certgraph/?data=https://gist.githubusercontent.com/lanrat/1ab1e78aaf5798049650d8d8ad7b58a1/raw/426d3a2498626014cb5ba2856ad0899787e4103f/google.json)
+
+[![google.com graph](https://cloud.githubusercontent.com/assets/164192/19752837/16cb8302-9bb5-11e6-810d-ea34594a63ef.png)](https://lanrat.github.io/certgraph/?data=https://gist.githubusercontent.com/lanrat/1ab1e78aaf5798049650d8d8ad7b58a1/raw/426d3a2498626014cb5ba2856ad0899787e4103f/google.json)
