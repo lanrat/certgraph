@@ -94,6 +94,7 @@
       <th>#</th>
       <th>Domain</th>
       <th>Status</th>
+      <th>Lookup</th>
     </tr>
   </thead>
   <tbody id="domain-list">
@@ -108,6 +109,7 @@
     <tr>
       <th>#</th>
       <th>Hash</th>
+      <th>Lookup</th>
     </tr>
   </thead>
   <tbody id="cert-list">
@@ -388,13 +390,13 @@ function createTables() {
     if (d.root == "true") {
       c = "info";
     }
-    $('#domain-list').append('<tr class="'+c+'"><td>'+ ++domainCount +'</td><td>'+linkifyDomain(d)+'</td><td>'+d.status+'</td></tr>');
+    $('#domain-list').append('<tr class="'+c+'"><td>'+ ++domainCount +'</td><td>'+linkifyDomain(d)+'</td><td>'+d.status+'</td><td>'+linkifyAny(d)+'</td></tr>');
   }
 
   var certCount = 0;
   function addTableCert(d) {
     //console.log("cert", d);
-    $('#cert-list').append('<tr><td>'+ ++certCount + '</td><td>'+linkifyCert(d)+'</td></tr>');
+    $('#cert-list').append('<tr><td>'+ ++certCount + '</td><td>'+linkifyCert(d)+'</td><td>'+linkifyAny(d)+'</td></tr>');
   }
 
 
@@ -410,11 +412,13 @@ function createTables() {
 }
 
 function linkifyCert(d) {
-  return '<a target="_blank" href="https://crt.sh/?q='+d.id+'">'+d.id+'</a>';
+  return '<a target="_blank" href="https://crt.sh/?sha256='+d.id+'">'+d.id+'</a>';
 }
-
 function linkifyDomain(d) {
   return '<a target="_blank" href="https://'+d.id+'">'+d.id+'</a>';
+}
+function linkifyAny(d) {
+  return '<a target="_blank" href="https://crt.sh/?q='+d.id+'">&#x1F50E;</a>';
 }
 
 function getQueryVariable(variable){
