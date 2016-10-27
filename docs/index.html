@@ -44,7 +44,7 @@
           <ul class="dropdown-menu" role="menu">
             <li><a href="#" data-toggle="modal" data-target="#URLmodal">URL</a></li>
             <li><a href="#" data-toggle="modal" data-target="#Pastemodal">Paste</a></li>
-            <li><a href="#">File Upload</a></li>
+            <li><a href="#" data-toggle="modal" data-target="#Filemodal">File Upload</a></li>
           </ul>
         </li>
             </ul>
@@ -65,7 +65,6 @@
 <div class="panel panel-info">
   <div class="panel-heading">Info</div>
   <div class="panel-body" id="node-info">
-    Click on a node in the graph to view details.
   </div>
 </div>
 
@@ -160,6 +159,29 @@
   </div>
 </div> <!-- /Paste Modal -->
 
+<!-- File Modal -->
+<div class="modal fade" id="Filemodal" role="dialog">
+  <div class="modal-dialog">
+    <!-- Modal content-->
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal">&times;</button>
+        <h4 class="modal-title">JSON File</h4>
+      </div>
+      <div class="modal-body">
+        <label for="inputFile" class="col-lg-2 control-label">File</label>
+        <div class="col-lg-10">
+         <input type="file" class="form-control" id="inputFile">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-dismiss="modal" id="loadFile">Load</button>
+        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div> <!-- /File Modal -->
+
 </div> <!-- /container-->
 <script src="//code.jquery.com/jquery-1.11.3.min.js"></script>
 <script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
@@ -201,11 +223,15 @@ function resetGraph() {
   d3.select("g").selectAll("*").remove();
   createTables();
 
+  // reset info
+  var el = document.getElementById("node-info");
+  el.innerText = "Click on a node in the graph to view details.";
+
   // redo layout
   simulation = d3.forceSimulation()
     .force("link", d3.forceLink().id(function(d) { return d.id; }))
     .force("charge", d3.forceManyBody().strength(-100))
-    .force("center", d3.forceCenter(width / 2, height / 2)); 
+    .force("center", d3.forceCenter(width / 2, height / 2));
 }
 
 function createGraph (error, graph) {
@@ -387,7 +413,7 @@ function loadURL(){
   history.pushState('', 'CertGraph', "?data="+url);
   resetGraph();
   d3.json(url, createGraph); 
-};
+}
 
 // new data from paste
 d3.select("#loadPaste").on("click", loadPaste);
@@ -397,8 +423,22 @@ function loadPaste(){
   resetGraph();
   var data = JSON.parse(dataStr);
   createGraph(null, data);
-};
+}
 
+// new data from paste
+d3.select("#loadFile").on("click", loadFile);
+function loadFile(){
+  var file = document.getElementById("inputFile").files[0];
+  history.pushState('', 'CertGraph', "?");
+  resetGraph();
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var dataStr = reader.result;
+    var data = JSON.parse(dataStr);
+    createGraph(null, data);
+  }
+  reader.readAsText(file);
+}
 
 // load initial graph data
 var dataURL = getQueryVariable("data");
