@@ -17,6 +17,22 @@
   stroke: #333;
   stroke-width: 1.5px;
 }
+
+.upload-drop-zone {
+  height: 200px;
+  border-width: 2px;
+  margin-bottom: 20px;
+  color: #ccc;
+  border-style: dashed;
+  border-color: #ccc;
+  line-height: 200px;
+  text-align: center
+}
+.upload-drop-zone.drop {
+  color: #222;
+  border-color: #222;
+}
+
 </style>
 </head>
 
@@ -171,12 +187,17 @@
       <div class="modal-body">
         <label for="inputFile" class="col-lg-2 control-label">File</label>
         <div class="col-lg-10">
-         <input type="file" class="form-control" id="inputFile">
+         <input type="file" class="form-control file" id="inputFile">
+        </div>
+        <br/>
+        <label for="drop-zone" class="col-lg-2 control-label">Or drag and drop a file below</label>
+        <div class="upload-drop-zone" id="drop-zone">
+          Just drag and drop a JSON file here
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-primary" data-dismiss="modal" id="loadFile">Load</button>
-        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-default" data-dismiss="modal" id="fileClose">Close</button>
       </div>
     </div>
   </div>
@@ -345,14 +366,14 @@ function writeDownloadLink(){
 function updateInfoBox(d) {
   if (d) {
     var el = document.getElementById("node-info");
-    var s = "Type: "+d.type+"\n";
+    var s = "Type: "+d.type+"</br>";
     if (d.type == "domain") {
-      s = s + "Domain: "+d.id+"\n";
-      s = s + "Status: "+d.status+"\n";
+      s = s + "Domain: "+linkifyDomain(d)+"</br>";
+      s = s + "Status: "+d.status+"</br>";
     }else if (d.type = "certificate") {
-      s = s + "Hash: "+d.id+"\n";
+      s = s + "Hash: "+linkifyCert(d)+"</br>";
     }
-    el.innerText = s;
+    el.innerHTML = s;
   }
 }
 
@@ -375,13 +396,13 @@ function createTables() {
     if (d.root == "true") {
       c = "info";
     }
-    $('#domain-list').append('<tr class="'+c+'"><td>'+ ++domainCount +'</td><td><a target="_blank" href="https://'+d.id+'">'+d.id+'</a></td><td>'+d.status+'</td></tr>');
+    $('#domain-list').append('<tr class="'+c+'"><td>'+ ++domainCount +'</td><td>'+linkifyDomain(d)+'</td><td>'+d.status+'</td></tr>');
   }
 
   var certCount = 0;
   function addTableCert(d) {
     //console.log("cert", d);
-    $('#cert-list').append('<tr><td>'+ ++certCount + '</td><td><a target="_blank" href="https://crt.sh/?q='+d.id+'">'+d.id+'</a></td></tr>');
+    $('#cert-list').append('<tr><td>'+ ++certCount + '</td><td>'+linkifyCert(d)+'</td></tr>');
   }
 
 
@@ -394,6 +415,14 @@ function createTables() {
       console.log("Unknown Type: ", d.type);
     }
   })
+}
+
+function linkifyCert(d) {
+  return '<a target="_blank" href="https://crt.sh/?q='+d.id+'">'+d.id+'</a>';
+}
+
+function linkifyDomain(d) {
+  return '<a target="_blank" href="https://crt.sh/?q='+d.id+'">'+d.id+'</a>';
 }
 
 function getQueryVariable(variable){
@@ -439,6 +468,52 @@ function loadFile(){
   }
   reader.readAsText(file);
 }
+
+var dropbox = document.getElementById('drop-zone');
+function dragenter(e) {
+  e.stopPropagation();
+  e.preventDefault();
+  dropbox.className = 'upload-drop-zone drop';
+  // console.log("enter");
+  return false;
+}
+function dragover(e) {
+  e.stopPropagation();
+  e.preventDefault();
+  // console.log("over");
+}
+function dragleave(e) {
+  e.stopPropagation();
+  e.preventDefault();
+  dropbox.className = 'upload-drop-zone';
+  // console.log("leave");
+  return false;
+}
+function drop(e) {
+  // console.log("drop");
+  e.stopPropagation();
+  e.preventDefault();
+  dropbox.className = 'upload-drop-zone';
+
+  var dt = e.dataTransfer;
+  var files = dt.files;
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var dataStr = reader.result;
+    var data = JSON.parse(dataStr);
+    resetGraph();
+    createGraph(null, data);
+  }
+  reader.readAsText(files[0]);
+  $('#fileClose').click();
+  return false;
+}
+dropbox.addEventListener("dragenter", dragenter, false);
+dropbox.addEventListener("dragover", dragover, false);
+dropbox.addEventListener("drop", drop, false);
+dropbox.addEventListener("dragleave",dragleave, false);
+
 
 // load initial graph data
 var dataURL = getQueryVariable("data");
