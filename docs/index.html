@@ -32,22 +32,20 @@
   color: #222;
   border-color: #222;
 }
-
 </style>
 </head>
-
 <body>
 <div class="container">
 
 <nav class="navbar navbar-inverse">
     <div class="container-fluid">
         <div class="navbar-header">
-            <!--<button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
                 <span class="sr-only">Toggle navigation</span>
                 <span class="icon-bar"></span>
                 <span class="icon-bar"></span>
                 <span class="icon-bar"></span>
-            </button>-->
+            </button>
             <a class="navbar-brand" href="#">CertGraph</a>
         </div>
         <div id="navbar" class="navbar-collapse collapse">
@@ -76,7 +74,6 @@
   </div>
     <svg id="graph" width="100%" height="500"></svg>
 </div>
-
 
 <div class="panel panel-info">
   <div class="panel-heading">Info</div>
@@ -120,7 +117,6 @@
   </div>
 
 </div>
-
 
 <footer>
 <hr>
@@ -218,13 +214,11 @@ var width = svgElem.width.animVal.value,
     height = svgElem.height.animVal.value;
 console.log(width, height);*/
 
-
 // TODO THIS
 // http://www.coppelia.io/2014/07/an-a-to-z-of-extra-features-for-the-d3-force-layout/
 
 var color = d3.scaleOrdinal(d3.schemeCategory10);
 var simulation;
-
 
 svg = svg.call(d3.zoom().on("zoom", zoomed)).append("g");
 
@@ -295,7 +289,6 @@ function createGraph (error, graph) {
     updateInfoBox(d);
   });
 
-
   node.append("title")
       .text(function(d) { return d.id; });
 
@@ -305,7 +298,6 @@ function createGraph (error, graph) {
 
   simulation.force("link")
       .links(graph.links);
-
 
   function ticked() {
     link
@@ -513,7 +505,6 @@ dropbox.addEventListener("dragenter", dragenter, false);
 dropbox.addEventListener("dragover", dragover, false);
 dropbox.addEventListener("drop", drop, false);
 dropbox.addEventListener("dragleave",dragleave, false);
-
 
 // load initial graph data
 var dataURL = getQueryVariable("data");
