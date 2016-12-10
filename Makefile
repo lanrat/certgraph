@@ -17,13 +17,13 @@ certgraph.mac: certgraph.go
 certgraph.exe: certgraph.go
 	GOOS=windows GOARCH=386 go build -o certgraph.exe $^
 
-release.linux: certgraph.linux
-	zip certgraph.linux.$(GIT_DATE).zip $^
+certgraph.linux.$(GIT_DATE).zip: certgraph.linux
+	zip $@ $^
 	
-release.mac: certgraph.mac
-	zip certgraph.mac.$(GIT_DATE).zip $^
+certgraph.mac.$(GIT_DATE).zip: certgraph.mac
+	zip $@ $^
 
-release.win: certgraph.exe
-	zip certgraph.win.$(GIT_DATE).zip $^
+certgraph.win.$(GIT_DATE).zip: certgraph.exe
+	zip $@ $^
 
-release: release.mac release.linux release.win
+release: certgraph.linux.$(GIT_DATE).zip certgraph.mac.$(GIT_DATE).zip certgraph.win.$(GIT_DATE).zip
