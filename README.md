@@ -51,6 +51,10 @@ max-dev-www.eff.org     3       Good    AC3933B1B95BA5254F43ADBE5E3E38E539C74456
 The above output represents the adjacency list for the graph for the root domain `eff.org`. The adjacency list is in the form:
 `Node    Depth    Status    Cert-Fingerprint    [Edge1 Edge2 ... EdgeN]`
 
+## [Releases](https://github.com/lanrat/certgraph/releases)
+
+Precompiled releases will occasionally be uploaded to the [releases github page](https://github.com/lanrat/certgraph/releases). https://github.com/lanrat/certgraph/releases
+
 ## Compiling
 
 To compile certgraph you must have a working go 1.5 or newer compiler on your system.
