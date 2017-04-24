@@ -68,7 +68,7 @@ go build -o certgraph certgraph.go
 
 A web UI is provided in the docs folder and is accessable at the github pages url [https://lanrat.github.io/certgraph/](https://lanrat.github.io/certgraph/).
 
-The web UI takes the putput provided with teh `-json` flag.
+The web UI takes the output provided with the `-json` flag.
 The JSON graph can be sent to the web interface as an uploaded file, remote URL, or as the query string using the data variable.
 
 ### [Example 1: eff.org](https://lanrat.github.io/certgraph/?data=https://gist.githubusercontent.com/lanrat/8187d01793bf3e578d76495182654206/raw/c49741b5206d81935febdf563452cc4346381e52/eff.json)
