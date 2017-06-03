@@ -31,6 +31,8 @@ var markedDomains = make(map[string]bool)
 var domainGraph = make(map[string]*DomainNode)
 var depth uint
 var save bool
+var git_date = "none"
+var git_hash = "DEADBEEF"
 
 // flags
 var port string
@@ -43,6 +45,7 @@ var sortCerts bool
 var savePath string
 var list bool
 var printJSON bool
+var ver bool
 
 // domain node conection status
 type domainStatus int
@@ -109,6 +112,7 @@ func (d *DomainNode) String() string {
 }
 
 func main() {
+	flag.BoolVar(&ver, "version", false, "print version and exit")
 	portPtr := flag.Uint("port", 443, "tcp port to connect to")
 	timeoutPtr := flag.Uint("timeout", 5, "tcp timeout in seconds")
 	flag.BoolVar(&verbose, "verbose", false, "verbose logging")
@@ -123,8 +127,13 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Usage of %s: [OPTION]... HOST...\n", os.Args[0])
 		flag.PrintDefaults()
 	}
-
 	flag.Parse()
+
+	if ver {
+		fmt.Printf("Git commit: [%s] %s\n", git_date, git_hash)
+		return
+	}
+
 	if printJSON {
 		// these arguments conflict
 		sortCerts = true
