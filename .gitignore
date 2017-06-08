@@ -1,6 +1,2 @@
 certgraph
-certgraph.mac
-certgraph.linux
-certgraph.exe
-*.zip
-*.json
+build/

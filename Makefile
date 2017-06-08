@@ -3,39 +3,29 @@ GIT_HASH := $(shell git rev-parse HEAD)
 
 BUILD_FLAGS := -ldflags "-X main.git_date=$(GIT_DATE) -X main.git_hash=$(GIT_HASH)"
 
+PLATFORMS := linux/amd64 linux/386 linux/arm darwin/amd64 windows/amd64 windows/386 openbsd/amd64
+SOURCES := certgraph.go
+
+temp = $(subst /, ,$@)
+os = $(word 1, $(temp))
+arch = $(word 2, $(temp))
+ext = $(shell if [ "$(os)" = "windows" ]; then echo ".exe"; fi)
+
 all: certgraph
+
+release: $(PLATFORMS)
+
+certgraph: $(SOURCES)
+	go build $(BUILD_FLAGS) -o $@ $(SOURCES)
+
+$(PLATFORMS): $(SOURCES)
+	CGO_ENABLED=0 GOOS=$(os) GOARCH=$(arch) go build $(BUILD_FLAGS) -o 'build/$(os)/$(arch)/certgraph$(ext)' $(SOURCES)
+	cd build/$(os)/$(arch)/; zip -r ../../certgraph-$(os)-$(arch)-$(GIT_DATE).zip .; cd ../../../
 
 fmt:
 	gofmt -s -w -l .
 
-certgraph: certgraph.go
-	go build $(BUILD_FLAGS) -o $@ $^
-
-certgraph.linux: certgraph.go
-	GOOS=linux go build $(BUILD_FLAGS) -o $@ $^
-
-certgraph.mac: certgraph.go
-	GOOS=darwin go build $(BUILD_FLAGS) -o $@ $^
-
-certgraph.exe: certgraph.go
-	GOOS=windows GOARCH=386 go build $(BUILD_FLAGS) -o certgraph.exe $^
-
-certgraph.openbsd: certgraph.go
-	GOOS=openbsd go build $(BUILD_FLAGS) -o $@ $^
-
-certgraph.linux.$(GIT_DATE).zip: certgraph.linux
-	zip $@ $^
-	
-certgraph.mac.$(GIT_DATE).zip: certgraph.mac
-	zip $@ $^
-
-certgraph.win.$(GIT_DATE).zip: certgraph.exe
-	zip $@ $^
-
-certgraph.openbsd.$(GIT_DATE).zip: certgraph.openbsd
-	zip $@ $^
-
-release: certgraph.linux.$(GIT_DATE).zip certgraph.mac.$(GIT_DATE).zip certgraph.win.$(GIT_DATE).zip certgraph.openbsd.$(GIT_DATE).zip
-
 clean:
-	rm certgraph certgraph.linux certgraph.mac certgraph.exe certgraph.openbsd certgraph.*.zip
+	rm -r certgraph build/
+
+.PHONY: all fmt clean release $(PLATFORMS)
