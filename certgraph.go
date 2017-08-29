@@ -32,6 +32,8 @@ var markedDomains = make(map[string]bool)
 var graph = NewCertGraph()
 var depth uint
 var save bool
+var git_date = "none"
+var git_hash = "DEADBEEF"
 
 // flags
 var port string
@@ -44,6 +46,7 @@ var savePath string
 var details bool
 var printJSON bool
 var ct bool
+var ver bool
 
 // domain node conection status
 type domainStatus int
@@ -263,6 +266,7 @@ func (graph CertGraph) GenerateMap() map[string][]map[string]string {
 
 
 func main() {
+	flag.BoolVar(&ver, "version", false, "print version and exit")
 	portPtr := flag.Uint("port", 443, "tcp port to connect to")
 	timeoutPtr := flag.Uint("timeout", 5, "tcp timeout in seconds")
 	flag.BoolVar(&verbose, "verbose", false, "verbose logging")
@@ -277,8 +281,12 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Usage of %s: [OPTION]... HOST...\n", os.Args[0])
 		flag.PrintDefaults()
 	}
-
 	flag.Parse()
+
+	if ver {
+		fmt.Printf("Git commit: [%s] %s\n", git_date, git_hash)
+		return
+	}
 
 	if flag.NArg() < 1 {
 		flag.Usage()
