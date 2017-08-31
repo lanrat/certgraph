@@ -205,9 +205,9 @@ func NewCertGraph() *CertGraph {
 	return graph
 }
 
-func (graph *CertGraph) CheckCert(fp fingerprint) bool {
-	_, ok := graph.certs.Load(fp)
-	return ok
+func (graph *CertGraph) LoadOrStoreCert(nodein *CertNode) (*CertNode, bool) {
+	nodeout, ok := graph.certs.LoadOrStore(nodein.Fingerprint, nodein)
+	return nodeout.(*CertNode), ok
 }
 
 // TODO check for existing?
@@ -566,11 +566,8 @@ func visitTLS(node *DomainNode) {
 
 	// TODO iterate over all certs, needs to also update graph.GetDomainNeighbors() too
 	certnode := NewCertNode(certs[0])
-	if graph.CheckCert(certnode.Fingerprint) {
-		certnode, _ = graph.GetCert(certnode.Fingerprint)
-	} else {
-		graph.AddCert(certnode)
-	}
+	certnode, _ = graph.LoadOrStoreCert(certnode)
+
 	certnode.HTTP = true
 	node.VisitedCert = certnode.Fingerprint
 }
