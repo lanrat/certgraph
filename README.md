@@ -57,7 +57,7 @@ Precompiled releases will occasionally be uploaded to the [releases github page]
 
 ## Compiling
 
-To compile certgraph you must have a working go 1.5 or newer compiler on your system.
+To compile certgraph you must have a working go 1.9 or newer compiler on your system.
 To compile for the running system compilation is as easy as running make
 ```
 certgraph$ make
