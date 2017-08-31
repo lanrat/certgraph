@@ -108,7 +108,6 @@ func NewDomainNode(domain string, depth uint) *DomainNode {
 // get the string representation of a node
 func (d *DomainNode) String() string {
 	if details {
-		// TODO need to update this and documentation after refractor
 		cert := ""
 		if d.Status == GOOD {
 			cert = d.VisitedCert.HexString()
@@ -139,7 +138,7 @@ type CertNode struct {
 }
 
 func (c *CertNode) String() string {
-	// TODO need to update this and documentation after refractor
+	//TODO Currently unused..
 	ct := ""
 	if c.CT {
 		ct = "CT"
