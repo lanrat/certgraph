@@ -27,8 +27,7 @@ cert chain
 
 // vars
 var conf = &tls.Config{InsecureSkipVerify: true}
-var markedDomains = make(map[string]bool)
-//var domainGraph = make(map[string]*DomainNode)
+var markedDomains = make(map[string]bool) // TODO move to graph?
 var graph = NewCertGraph()
 var depth uint
 var save bool
@@ -46,6 +45,7 @@ var savePath string
 var details bool
 var printJSON bool
 var ct bool
+var tls_connect bool
 var ver bool
 
 // domain node conection status
@@ -91,6 +91,7 @@ type DomainNode struct {
 	Domain      string
 	Depth       uint
 	VisitedCert fingerprint
+	CTCerts     []fingerprint
 	Status      domainStatus
 	Root        bool
 }
@@ -100,6 +101,7 @@ func NewDomainNode(domain string, depth uint) *DomainNode {
 	node := new(DomainNode)
 	node.Domain = directDomain(domain)
 	node.Depth = depth
+	node.CTCerts = make([]fingerprint, 0, 0)
 	return node
 }
 
@@ -116,6 +118,10 @@ func (d *DomainNode) String() string {
 	return fmt.Sprintf("%s", d.Domain)
 }
 
+func (d *DomainNode) AddCTFingerprint(fp fingerprint) {
+	d.CTCerts = append(d.CTCerts, fp)
+}
+
 func (d *DomainNode) ToMap() map[string]string {
 	m := make(map[string]string)
 	m["type"] = "domain"
@@ -127,9 +133,9 @@ func (d *DomainNode) ToMap() map[string]string {
 
 type CertNode struct {
 	Fingerprint fingerprint
-	Domains 	[]string
-	CT 			bool
-	HTTP		bool
+	Domains     []string
+	CT          bool
+	HTTP        bool
 }
 
 func (c *CertNode) String() string {
@@ -166,7 +172,7 @@ func NewCertNode(cert *x509.Certificate) *CertNode {
 	// generate Fingerprint
 	certnode.Fingerprint = sha256.Sum256(cert.Raw)
 
-    // domains
+	// domains
 	// used to ensure uniq entries in domains array
 	domainMap := make(map[string]bool)
 	// add the CommonName just to be safe
@@ -190,87 +196,123 @@ func NewCertNode(cert *x509.Certificate) *CertNode {
 
 // main graph storage engine
 type CertGraph struct {
-	//TODO switch to syncmap?
-	domains  	map[string]*DomainNode
-	certs 	 	map[fingerprint]*CertNode
-
+	domains sync.Map
+	certs 	sync.Map
 }
 
 func NewCertGraph() *CertGraph {
 	graph := new(CertGraph)
-	graph.domains = make(map[string]*DomainNode)
-	graph.certs = make(map[fingerprint]*CertNode)
 	return graph
 }
 
-// TODO check for existing?
-func (graph CertGraph) AddCert(certnode *CertNode) {
-	graph.certs[certnode.Fingerprint] = certnode
+func (graph *CertGraph) CheckCert(fp fingerprint) bool {
+	_, ok := graph.certs.Load(fp)
+	return ok
 }
 
 // TODO check for existing?
-func (graph CertGraph) AddDomain(domainnode *DomainNode) {
-	graph.domains[domainnode.Domain] = domainnode
+func (graph *CertGraph) AddCert(certnode *CertNode) {
+	graph.certs.Store(certnode.Fingerprint, certnode)
 }
 
-func (graph CertGraph) GetCert(fp fingerprint) (*CertNode, bool) {
-	node, ok := graph.certs[fp]
-	return node, ok
+// TODO check for existing?
+func (graph *CertGraph) AddDomain(domainnode *DomainNode) {
+	graph.domains.Store(domainnode.Domain, domainnode)
 }
 
-func (graph CertGraph) GetDomain(domain string) (*DomainNode, bool) {
-	node, ok := graph.domains[domain]
-	return node, ok
-}
-
-func (graph CertGraph) GetDomainNeighbors(domain string) ([]string) {
-	neighbors := make([]string, 0, 3)
-	//domain = directDomain(domain)
-	v("GetDomainNeighbors host", domain)
-	node, ok1 := graph.domains[domain]
-	if ok1 {
-		v("GetDomainNeighbors domainnode", node)
-		certnode, ok2 := graph.certs[node.VisitedCert]
-		if ok2 {
-			v("GetDomainNeighbors cert", certnode)
-			neighbors = certnode.Domains
-		} 
+func (graph *CertGraph) GetCert(fp fingerprint) (*CertNode, bool) {
+	node, ok := graph.certs.Load(fp)
+	if ok {
+		return node.(*CertNode), true
 	}
-	return neighbors
+	return nil, false
 }
 
-func (graph CertGraph) GenerateMap() map[string][]map[string]string {
+func (graph *CertGraph) GetDomain(domain string) (*DomainNode, bool) {
+	node, ok := graph.domains.Load(domain)
+	if ok {
+		return node.(*DomainNode), true
+	}
+	return nil, false
+}
+
+func (graph *CertGraph) GetDomainNeighbors(domain string) []string {
+	neighbors := make(map[string]bool)
+
+	//domain = directDomain(domain)
+	node, ok := graph.domains.Load(domain)
+	if ok {
+		domainnode := node.(*DomainNode)
+		// visited cert neighbors
+		certnode, ok := graph.certs.Load(domainnode.VisitedCert)
+		if ok {
+			for _, neighbor := range certnode.(*CertNode).Domains {
+				neighbors[neighbor] = true
+				v(domain, "- CERT ->", neighbor)
+			}
+		}
+		
+		// CT neighbors
+		for _, fp := range domainnode.CTCerts {
+			certnode, ok := graph.certs.Load(fp)
+			if ok {
+				for _, neighbor := range certnode.(*CertNode).Domains {
+					neighbors[neighbor] = true
+					v(domain, "-- CT -->", neighbor)
+				}
+			}
+		}
+	}
+
+	//exclude domain from own neighbors list
+	neighbors[domain] = false
+
+	// convert map to array
+	neighbor_list := make([]string, 0, len(neighbors))
+	for key := range neighbors {
+		if neighbors[key] {
+			neighbor_list = append(neighbor_list, key)
+		}
+	}
+	return neighbor_list
+}
+
+func (graph *CertGraph) GenerateMap() map[string][]map[string]string {
 	m := make(map[string][]map[string]string)
 	m["nodes"] = make([]map[string]string, 0, 2*len(markedDomains))
 	m["links"] = make([]map[string]string, 0, 2*len(markedDomains))
 
-
 	// add all domain nodes
-	for _, domainNode := range graph.domains {
-		m["nodes"] = append(m["nodes"], domainNode.ToMap())
-		if domainNode.Status == GOOD {
-			m["links"] = append(m["links"], map[string]string{"source": domainNode.Domain, "target": domainNode.VisitedCert.HexString(), "type": "uses"})
+	graph.domains.Range(func(key, value interface{}) bool {
+		domainnode := value.(*DomainNode)
+		m["nodes"] = append(m["nodes"], domainnode.ToMap())
+		if domainnode.Status == GOOD {
+			m["links"] = append(m["links"], map[string]string{"source": domainnode.Domain, "target": domainnode.VisitedCert.HexString(), "type": "uses"})
 		}
-	}
+		return true
+	})
 
 	// add all cert nodes
-	for _, certNode := range graph.certs {
-		m["nodes"] = append(m["nodes"], certNode.ToMap())
-		for _, domain := range certNode.Domains {
-			m["links"] = append(m["links"], map[string]string{"source": certNode.Fingerprint.HexString(), "target": directDomain(domain), "type": "sans"})
+	graph.certs.Range(func(key, value interface{}) bool {
+		certnode := value.(*CertNode)
+		m["nodes"] = append(m["nodes"], certnode.ToMap())
+		for _, domain := range certnode.Domains {
+			m["links"] = append(m["links"], map[string]string{"source": certnode.Fingerprint.HexString(), "target": directDomain(domain), "type": "sans"})
 		}
-	}
+		return true
+	})
 
 	return m
 }
 
-
 func main() {
+	var notls bool
 	flag.BoolVar(&ver, "version", false, "print version and exit")
 	portPtr := flag.Uint("port", 443, "tcp port to connect to")
 	timeoutPtr := flag.Uint("timeout", 5, "tcp timeout in seconds")
 	flag.BoolVar(&verbose, "verbose", false, "verbose logging")
-	flag.BoolVar(&ct, "ct", false, "use certificate transparancy instead of connecting to hosts")
+	flag.BoolVar(&ct, "ct", false, "use certificate transparancy search to find certificates")
+	flag.BoolVar(&notls, "notls", false, "don't connect to hosts to collect certificates")
 	flag.UintVar(&maxDepth, "depth", 20, "maximum BFS depth to go, default: 20")
 	flag.UintVar(&parallel, "parallel", 10, "number of certificates to retrieve in parallel, default: 10")
 	flag.BoolVar(&starttls, "starttls", false, "connect without TLS and then upgrade with STARTTLS for SMTP, useful with -port 25")
@@ -282,9 +324,15 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+	tls_connect = !notls
 
 	if ver {
 		fmt.Printf("Git commit: [%s] %s\n", git_date, git_hash)
+		return
+	}
+
+	if !ct && !tls_connect {
+		fmt.Fprintln(os.Stderr, "Must allow TLS or CT or both.")
 		return
 	}
 
@@ -300,14 +348,18 @@ func main() {
 	port = strconv.FormatUint(uint64(*portPtr), 10)
 	timeout = time.Duration(*timeoutPtr) * time.Second
 	startDomains := flag.Args()
-	for i := range startDomains {
-		startDomains[i] = strings.ToLower(startDomains[i])
+	for i, domain := range startDomains {
+		startDomains[i] = strings.ToLower(domain)
 	}
 	if len(savePath) > 0 {
 		save = true
 		err := os.MkdirAll(savePath, 0777)
 		if err != nil {
-			fmt.Println(err);
+			fmt.Println(err)
+			return
+		}
+		if !tls_connect {
+			fmt.Fprintln(os.Stderr, "Can not save certificates from CT search")
 			return
 		}
 	}
@@ -325,7 +377,7 @@ func main() {
 // verbose log
 func v(a ...interface{}) {
 	if verbose {
-		fmt.Fprintln( os.Stderr, a...)
+		fmt.Fprintln(os.Stderr, a...)
 	}
 }
 
@@ -378,7 +430,7 @@ func printJSONGraph() {
 // perform Breadth first search to build the graph
 func BFS(roots []string) {
 	var wg sync.WaitGroup
-	domainChan := make(chan *DomainNode, 5) // input queue
+	domainChan := make(chan *DomainNode, 5)      // input queue
 	domainGraphChan := make(chan *DomainNode, 5) // output queue
 
 	// thread limit code
@@ -422,10 +474,8 @@ func BFS(roots []string) {
 					v("Visiting", domainNode.Depth, domainNode.Domain)
 					BFSVisit(domainNode) // visit
 					domainGraphChan <- domainNode
-					// TODO iterate over all certs?
 					for _, neighbor := range graph.GetDomainNeighbors(domainNode.Domain) {
 						wg.Add(1)
-						v("Adding node:", domainNode.Domain, neighbor)
 						domainChan <- NewDomainNode(neighbor, domainNode.Depth+1)
 					}
 				}(domainNode)
@@ -435,7 +485,7 @@ func BFS(roots []string) {
 		}
 	}()
 
-	// save thread
+	// save/output thread
 	done := make(chan bool)
 	go func() {
 		for {
@@ -457,52 +507,56 @@ func BFS(roots []string) {
 }
 
 // visit each node and get and set its neighbors
-// TODO combo mode!
 func BFSVisit(node *DomainNode) {
+	if tls_connect {
+		visitTLS(node)
+	}
 	if ct {
 		visitCT(node)
-	} else {
-		visitTLS(node)
 	}
 }
 
 // visit nodes by searching certificate transparancy logs
 func visitCT(node *DomainNode) {
-	node.Status = UNKNOWN
-	// get neighbors domains
-	/*s, err := QueryDomain(node.Domain, false, false)
+	// perform ct search
+	// TODO do pagnation in multiple threads to not block on long searches
+	search_result, err := QueryDomain(node.Domain, false, false)
 	if err != nil {
 		v(err)
 		return
-	}*/
-/*
-	for i := range s {
-		//fmt.Print(s[i].Hash, " ")
-		h, err := QueryHash(s[i].Hash)
-		if err != nil {
-			v(err)
-			return
+	}
+
+	// add cert nodes to graph
+	for _, result := range search_result {
+		// add certnode to graph
+		fp := result.GetFingerprint()
+
+		certnode, exists := graph.GetCert(fp)
+
+		if !exists {
+			// get cert details
+			cert_result, err := QueryHash(result.Hash)
+			if err != nil {
+				v(err)
+				continue
+			}
+
+			certnode = new(CertNode)
+			certnode.Fingerprint = fp
+			certnode.Domains = cert_result.DnsNames
+			graph.AddCert(certnode)
 		}
-		fmt.Println(h.SerialNumber)
-		/*for j := range h.DnsNames {
-		    fmt.Println("\t", h.DnsNames[j])
-		}*/
-//	}
 
-	// lowercase all domains
-
-	// TODO
-
-	// TODO need to refractor so that domaingraph is indexed by cert hash
+		certnode.CT = true
+		node.AddCTFingerprint(certnode.Fingerprint)
+	}
 }
 
 // visit nodes by connecting to them
 func visitTLS(node *DomainNode) {
 	var certs []*x509.Certificate
 	node.Status, certs = getPeerCerts(node.Domain)
-	v("num certs:", len(certs))
 	if save && len(certs) > 0 {
-		// TODO move to own thread to reduce disk io?
 		certToPEMFile(certs, path.Join(savePath, node.Domain)+".pem")
 	}
 
@@ -510,12 +564,14 @@ func visitTLS(node *DomainNode) {
 		return
 	}
 
-	// TODO iterate over all certs, nedds to also update graph.GetDomainNeighbors() too
-	// TODO check for cert already existing before add
+	// TODO iterate over all certs, needs to also update graph.GetDomainNeighbors() too
 	certnode := NewCertNode(certs[0])
+	if graph.CheckCert(certnode.Fingerprint) {
+		certnode, _ = graph.GetCert(certnode.Fingerprint)
+	} else {
+		graph.AddCert(certnode)
+	}
 	certnode.HTTP = true
-	graph.AddCert(certnode)
-	v("New cert:", certnode)
 	node.VisitedCert = certnode.Fingerprint
 }
 
@@ -524,8 +580,6 @@ func getPeerCerts(host string) (dStatus domainStatus, certs []*x509.Certificate)
 	addr := net.JoinHostPort(host, port)
 	dialer := &net.Dialer{Timeout: timeout}
 	dStatus = ERROR
-
-	v("peer certs", host)
 
 	if starttls {
 		conn, err := dialer.Dial("tcp", addr)

@@ -4,7 +4,7 @@ GIT_HASH := $(shell git rev-parse HEAD)
 BUILD_FLAGS := -ldflags "-X main.git_date=$(GIT_DATE) -X main.git_hash=$(GIT_HASH)"
 
 PLATFORMS := linux/amd64 linux/386 linux/arm darwin/amd64 windows/amd64 windows/386 openbsd/amd64
-SOURCES := certgraph.go
+SOURCES := certgraph.go google_ct.go
 
 temp = $(subst /, ,$@)
 os = $(word 1, $(temp))
