@@ -196,7 +196,7 @@ func NewCertNode(cert *x509.Certificate) *CertNode {
 // main graph storage engine
 type CertGraph struct {
 	domains sync.Map
-	certs 	sync.Map
+	certs   sync.Map
 }
 
 func NewCertGraph() *CertGraph {
@@ -250,7 +250,7 @@ func (graph *CertGraph) GetDomainNeighbors(domain string) []string {
 				v(domain, "- CERT ->", neighbor)
 			}
 		}
-		
+
 		// CT neighbors
 		for _, fp := range domainnode.CTCerts {
 			certnode, ok := graph.certs.Load(fp)
