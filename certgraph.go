@@ -127,7 +127,7 @@ func (d *DomainNode) ToMap() map[string]string {
 	m["id"] = d.Domain
 	m["status"] = d.Status.String()
 	m["root"] = strconv.FormatBool(d.Root)
-	m["depth"] = d.Depth
+	m["depth"] = strconv.FormatUint(uint64(d.Depth), 10)
 	return m
 }
 
