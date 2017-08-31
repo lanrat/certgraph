@@ -92,7 +92,7 @@ func (sr *CTDomainSearchResult) GetFingerprint() fingerprint {
 	for i := 0; i < len(data) && i < len(fp); i++ {
 		fp[i] = data[i]
 	}
-	return fp;
+	return fp
 }
 
 // struct to hold CA information about a domain search
