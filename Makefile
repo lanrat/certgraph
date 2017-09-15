@@ -28,4 +28,7 @@ fmt:
 clean:
 	rm -r certgraph build/
 
-.PHONY: all fmt clean release $(PLATFORMS)
+serv:
+	(cd docs; python -m SimpleHTTPServer)
+
+.PHONY: all fmt clean release serv $(PLATFORMS)
