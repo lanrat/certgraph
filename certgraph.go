@@ -278,17 +278,17 @@ func (graph *CertGraph) GetDomainNeighbors(domain string) []string {
 	return neighbor_list
 }
 
-func (graph *CertGraph) GenerateMap() map[string][]map[string]string {
-	m := make(map[string][]map[string]string)
-	m["nodes"] = make([]map[string]string, 0, 2*len(markedDomains))
-	m["links"] = make([]map[string]string, 0, 2*len(markedDomains))
+func (graph *CertGraph) GenerateMap() map[string]interface{} {
+	m := make(map[string]interface{})
+	nodes := make([]map[string]string, 0, 2*len(markedDomains))
+	links := make([]map[string]string, 0, 2*len(markedDomains))
 
 	// add all domain nodes
 	graph.domains.Range(func(key, value interface{}) bool {
 		domainnode := value.(*DomainNode)
-		m["nodes"] = append(m["nodes"], domainnode.ToMap())
+		nodes = append(nodes, domainnode.ToMap())
 		if domainnode.Status == GOOD {
-			m["links"] = append(m["links"], map[string]string{"source": domainnode.Domain, "target": domainnode.VisitedCert.HexString(), "type": "uses"})
+			links = append(links, map[string]string{"source": domainnode.Domain, "target": domainnode.VisitedCert.HexString(), "type": "uses"})
 		}
 		return true
 	})
@@ -296,18 +296,43 @@ func (graph *CertGraph) GenerateMap() map[string][]map[string]string {
 	// add all cert nodes
 	graph.certs.Range(func(key, value interface{}) bool {
 		certnode := value.(*CertNode)
-		m["nodes"] = append(m["nodes"], certnode.ToMap())
+		nodes = append(nodes, certnode.ToMap())
 		for _, domain := range certnode.Domains {
 			domain := directDomain(domain)
 			_, ok := graph.GetDomain(domain)
 			if ok {
-				m["links"] = append(m["links"], map[string]string{"source": certnode.Fingerprint.HexString(), "target": domain, "type": "sans"})
+				links = append(links, map[string]string{"source": certnode.Fingerprint.HexString(), "target": domain, "type": "sans"})
 			}// TODO do something with alt-names that are not in graph like wildcards
 		}
 		return true
 	})
 
+	m["nodes"] = nodes
+	m["links"] = links
 	return m
+}
+
+func generateGraphMetadata() map[string]interface{} {
+	data := make(map[string]interface{})
+	data["version"] = version()
+	data["website"] = "https://lanrat.github.io"
+	data["scan_date"] = time.Now().UTC()
+	options := make(map[string]interface{})
+	options["starttls"] = starttls
+	options["parallel"] = parallel
+	options["depth"] = depth
+	options["tls"] = tls_connect
+	options["ct"] = ct
+	options["ct_subdomains"] = include_ct_sub
+	options["timeout"] = timeout
+	options["port"] = port
+	data["options"] = options
+	return data
+}
+
+func version() string {
+	return fmt.Sprintf("Git commit: %s [%s]", git_date, git_hash)
+
 }
 
 func main() {
@@ -333,7 +358,7 @@ func main() {
 	tls_connect = !notls
 
 	if ver {
-		fmt.Printf("Git commit: [%s] %s\n", git_date, git_hash)
+		fmt.Println(version())
 		return
 	}
 
@@ -424,6 +449,7 @@ func directDomain(domain string) string {
 // prnts the graph as a json object
 func printJSONGraph() {
 	jsonGraph := graph.GenerateMap()
+	jsonGraph["certgraph"] = generateGraphMetadata()
 
 	j, err := json.MarshalIndent(jsonGraph, "", "\t")
 	if err != nil {
