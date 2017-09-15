@@ -317,6 +317,7 @@ func generateGraphMetadata() map[string]interface{} {
 	data["version"] = version()
 	data["website"] = "https://lanrat.github.io"
 	data["scan_date"] = time.Now().UTC()
+	data["command"] = strings.Join(os.Args, " ")
 	options := make(map[string]interface{})
 	options["starttls"] = starttls
 	options["parallel"] = parallel
