@@ -494,7 +494,9 @@ func BFS(roots []string) {
 			domainNode, more := <-domainGraphChan
 			if more {
 				if !printJSON {
-					fmt.Println(domainNode)
+					fmt.Fprintln(os.Stdout, domainNode)
+				}else if details {
+					fmt.Fprintln(os.Stderr, domainNode)
 				}
 			} else {
 				done <- true
