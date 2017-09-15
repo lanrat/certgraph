@@ -298,7 +298,11 @@ func (graph *CertGraph) GenerateMap() map[string][]map[string]string {
 		certnode := value.(*CertNode)
 		m["nodes"] = append(m["nodes"], certnode.ToMap())
 		for _, domain := range certnode.Domains {
-			m["links"] = append(m["links"], map[string]string{"source": certnode.Fingerprint.HexString(), "target": directDomain(domain), "type": "sans"})
+			domain := directDomain(domain)
+			_, ok := graph.GetDomain(domain)
+			if ok {
+				m["links"] = append(m["links"], map[string]string{"source": certnode.Fingerprint.HexString(), "target": domain, "type": "sans"})
+			}// TODO do something with alt-names that are not in graph like wildcards
 		}
 		return true
 	})
