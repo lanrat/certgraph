@@ -45,6 +45,7 @@ var savePath string
 var details bool
 var printJSON bool
 var ct bool
+var include_ct_sub bool
 var tls_connect bool
 var ver bool
 
@@ -312,8 +313,9 @@ func main() {
 	timeoutPtr := flag.Uint("timeout", 5, "tcp timeout in seconds")
 	flag.BoolVar(&verbose, "verbose", false, "verbose logging")
 	flag.BoolVar(&ct, "ct", false, "use certificate transparancy search to find certificates")
+	flag.BoolVar(&include_ct_sub, "ct-subdomains", false, "include sub-domains in certificate transparancy search")
 	flag.BoolVar(&notls, "notls", false, "don't connect to hosts to collect certificates")
-	flag.UintVar(&maxDepth, "depth", 20, "maximum BFS depth to go")
+	flag.UintVar(&maxDepth, "depth", 5, "maximum BFS depth to go")
 	flag.UintVar(&parallel, "parallel", 10, "number of certificates to retrieve in parallel")
 	flag.BoolVar(&starttls, "starttls", false, "connect without TLS and then upgrade with STARTTLS for SMTP, useful with -port 25")
 	flag.BoolVar(&details, "details", false, "print details about the domains crawled")
@@ -520,7 +522,7 @@ func BFSVisit(node *DomainNode) {
 func visitCT(node *DomainNode) {
 	// perform ct search
 	// TODO do pagnation in multiple threads to not block on long searches
-	search_result, err := QueryDomain(node.Domain, false, false)
+	search_result, err := QueryDomain(node.Domain, false, include_ct_sub)
 	if err != nil {
 		v(err)
 		return
