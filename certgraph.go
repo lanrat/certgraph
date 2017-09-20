@@ -21,8 +21,8 @@ import (
 )
 
 /* TODO
+option to disable crawling CDN
 follow http redirects
-cert chain
 */
 
 // vars
