@@ -18,6 +18,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"regexp"
 )
 
 /* TODO
@@ -48,6 +49,7 @@ var ct bool
 var include_ct_sub bool
 var tls_connect bool
 var ver bool
+var skipCDN bool
 
 // domain node conection status
 type domainStatus int
@@ -137,6 +139,7 @@ type CertNode struct {
 	Domains     []string
 	CT          bool
 	HTTP        bool
+	CDNCert		bool
 }
 
 func (c *CertNode) String() string {
@@ -245,22 +248,33 @@ func (graph *CertGraph) GetDomainNeighbors(domain string) []string {
 	if ok {
 		domainnode := node.(*DomainNode)
 		// visited cert neighbors
-		certnode, ok := graph.certs.Load(domainnode.VisitedCert)
+		node, ok := graph.certs.Load(domainnode.VisitedCert)
 		if ok {
-			for _, neighbor := range certnode.(*CertNode).Domains {
-				neighbors[neighbor] = true
-				v(domain, "- CERT ->", neighbor)
+			certnode := node.(*CertNode)
+			if skipCDN && certnode.CDNCert {
+				v(domain, "-> CDN CERT")
+			} else {
+				for _, neighbor := range certnode.Domains {
+					neighbors[neighbor] = true
+					v(domain, "- CERT ->", neighbor)
+				}
 			}
 		}
 
 		// CT neighbors
 		for _, fp := range domainnode.CTCerts {
-			certnode, ok := graph.certs.Load(fp)
+			node, ok := graph.certs.Load(fp)
 			if ok {
-				for _, neighbor := range certnode.(*CertNode).Domains {
-					neighbors[neighbor] = true
-					v(domain, "-- CT -->", neighbor)
+				certnode := node.(*CertNode)
+				if skipCDN && certnode.CDNCert {
+					v(domain, "-> CDN CERT")
+				}else {
+						for _, neighbor := range certnode.Domains {
+						neighbors[neighbor] = true
+						v(domain, "-- CT -->", neighbor)
+					}
 				}
+				
 			}
 		}
 	}
@@ -344,6 +358,7 @@ func main() {
 	flag.BoolVar(&verbose, "verbose", false, "verbose logging")
 	flag.BoolVar(&ct, "ct", false, "use certificate transparancy search to find certificates")
 	flag.BoolVar(&include_ct_sub, "ct-subdomains", false, "include sub-domains in certificate transparancy search")
+	flag.BoolVar(&skipCDN, "skip-cdn", false, "do not crawl into CDN certs")
 	flag.BoolVar(&notls, "notls", false, "don't connect to hosts to collect certificates")
 	flag.UintVar(&maxDepth, "depth", 5, "maximum BFS depth to go")
 	flag.UintVar(&parallel, "parallel", 10, "number of certificates to retrieve in parallel")
@@ -352,7 +367,7 @@ func main() {
 	flag.BoolVar(&printJSON, "json", false, "print the graph as json, can be used for graph in web UI")
 	flag.StringVar(&savePath, "save", "", "save certs to folder in PEM formate")
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage of %s: [OPTION]... HOST...\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage of %s: [OPTION]... HOST...\n\thttps://github.com/lanrat/certgraph\nOPTIONS:\n", os.Args[0])
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -579,6 +594,8 @@ func visitCT(node *DomainNode) {
 			certnode = new(CertNode)
 			certnode.Fingerprint = fp
 			certnode.Domains = cert_result.DnsNames
+			certnode.CDNCert = CDNCert(cert_result.DnsNames)
+
 			graph.AddCert(certnode)
 		}
 
@@ -601,10 +618,24 @@ func visitTLS(node *DomainNode) {
 
 	// TODO iterate over all certs, needs to also update graph.GetDomainNeighbors() too
 	certnode := NewCertNode(certs[0])
+	certnode.CDNCert = CDNCert(certnode.Domains)
 	certnode, _ = graph.LoadOrStoreCert(certnode)
 
 	certnode.HTTP = true
 	node.VisitedCert = certnode.Fingerprint
+}
+
+
+func CDNCert(domains []string) bool {
+	for _, domain := range domains {
+		// cloudflair
+		matched, _ := regexp.MatchString("ssl[0-9]*\\.cloudflaressl\\.com", domain)
+		if matched {
+			return true
+		}
+		// TODO include other CDNs
+	}
+	return false
 }
 
 // gets the certificats found for a given domain
