@@ -22,7 +22,6 @@ import (
 )
 
 /* TODO
-option to disable crawling CDN
 follow http redirects
 */
 
@@ -258,6 +257,7 @@ func (graph *CertGraph) GetDomainNeighbors(domain string) []string {
 					neighbors[neighbor] = true
 					v(domain, "- CERT ->", neighbor)
 				}
+
 			}
 		}
 
@@ -296,6 +296,7 @@ func (graph *CertGraph) GenerateMap() map[string]interface{} {
 	m := make(map[string]interface{})
 	nodes := make([]map[string]string, 0, 2*len(markedDomains))
 	links := make([]map[string]string, 0, 2*len(markedDomains))
+
 
 	// add all domain nodes
 	graph.domains.Range(func(key, value interface{}) bool {
@@ -349,6 +350,7 @@ func version() string {
 	return fmt.Sprintf("Git commit: %s [%s]", git_date, git_hash)
 
 }
+
 
 func main() {
 	var notls bool
@@ -594,6 +596,7 @@ func visitCT(node *DomainNode) {
 			certnode = new(CertNode)
 			certnode.Fingerprint = fp
 			certnode.Domains = cert_result.DnsNames
+
 			certnode.CDNCert = CDNCert(cert_result.DnsNames)
 
 			graph.AddCert(certnode)
@@ -619,13 +622,14 @@ func visitTLS(node *DomainNode) {
 	// TODO iterate over all certs, needs to also update graph.GetDomainNeighbors() too
 	certnode := NewCertNode(certs[0])
 	certnode.CDNCert = CDNCert(certnode.Domains)
+
 	certnode, _ = graph.LoadOrStoreCert(certnode)
 
 	certnode.HTTP = true
 	node.VisitedCert = certnode.Fingerprint
 }
 
-
+// TODO make method on cert object?
 func CDNCert(domains []string) bool {
 	for _, domain := range domains {
 		// cloudflair
@@ -633,10 +637,15 @@ func CDNCert(domains []string) bool {
 		if matched {
 			return true
 		}
+
+		if domain == "i.ssl.fastly.net" {
+			return true
+		}
 		// TODO include other CDNs
 	}
 	return false
 }
+
 
 // gets the certificats found for a given domain
 func getPeerCerts(host string) (dStatus domainStatus, certs []*x509.Certificate) {
