@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -12,13 +11,14 @@ import (
 	"net/smtp"
 	"os"
 	"path"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
-	"regexp"
+
+	"github.com/lanrat/certgraph/ct/google"
+	"github.com/lanrat/certgraph/graph"
+	"github.com/lanrat/certgraph/status"
 )
 
 /* TODO
@@ -28,7 +28,7 @@ follow http redirects
 // vars
 var conf = &tls.Config{InsecureSkipVerify: true}
 var markedDomains = make(map[string]bool) // TODO move to graph?
-var graph = NewCertGraph()
+var dgraph = graph.NewCertGraph()
 var depth uint
 var save bool
 var git_date = "none"
@@ -49,283 +49,6 @@ var include_ct_sub bool
 var tls_connect bool
 var ver bool
 var skipCDN bool
-
-// domain node conection status
-type domainStatus int
-
-const (
-	UNKNOWN = iota
-	GOOD    = iota
-	TIMEOUT = iota
-	NO_HOST = iota
-	REFUSED = iota
-	ERROR   = iota
-)
-
-type fingerprint [sha256.Size]byte
-
-// print fingerprint as hex
-func (fp fingerprint) HexString() string {
-	return fmt.Sprintf("%X", fp)
-}
-
-// return domain status for printing
-func (status domainStatus) String() string {
-	switch status {
-	case UNKNOWN:
-		return "Unknown"
-	case GOOD:
-		return "Good"
-	case TIMEOUT:
-		return "Timeout"
-	case NO_HOST:
-		return "No Host"
-	case REFUSED:
-		return "Refused"
-	case ERROR:
-		return "Error"
-	}
-	return "?"
-}
-
-// structure to store a domain and its edges
-type DomainNode struct {
-	Domain      string
-	Depth       uint
-	VisitedCert fingerprint
-	CTCerts     []fingerprint
-	Status      domainStatus
-	Root        bool
-}
-
-// constructor for DomainNode, converts domain to directDomain
-func NewDomainNode(domain string, depth uint) *DomainNode {
-	node := new(DomainNode)
-	node.Domain = directDomain(domain)
-	node.Depth = depth
-	node.CTCerts = make([]fingerprint, 0, 0)
-	return node
-}
-
-// get the string representation of a node
-func (d *DomainNode) String() string {
-	if details {
-		cert := ""
-		if d.Status == GOOD {
-			cert = d.VisitedCert.HexString()
-		}
-		return fmt.Sprintf("%s\t%d\t%s\t%s", d.Domain, d.Depth, d.Status, cert)
-	}
-	return fmt.Sprintf("%s", d.Domain)
-}
-
-func (d *DomainNode) AddCTFingerprint(fp fingerprint) {
-	d.CTCerts = append(d.CTCerts, fp)
-}
-
-func (d *DomainNode) ToMap() map[string]string {
-	m := make(map[string]string)
-	m["type"] = "domain"
-	m["id"] = d.Domain
-	m["status"] = d.Status.String()
-	m["root"] = strconv.FormatBool(d.Root)
-	m["depth"] = strconv.FormatUint(uint64(d.Depth), 10)
-	return m
-}
-
-type CertNode struct {
-	Fingerprint fingerprint
-	Domains     []string
-	CT          bool
-	HTTP        bool
-	CDNCert		bool
-}
-
-func (c *CertNode) String() string {
-	//TODO Currently unused..
-	ct := ""
-	if c.CT {
-		ct = "CT"
-	}
-	http := ""
-	if c.HTTP {
-		http = "HTTP"
-	}
-	return fmt.Sprintf("%s\t%s %s\t%v", c.Fingerprint.HexString(), http, ct, c.Domains)
-}
-
-func (c *CertNode) ToMap() map[string]string {
-	m := make(map[string]string)
-	m["type"] = "certificate"
-	m["id"] = c.Fingerprint.HexString()
-	s := ""
-	if c.HTTP {
-		s = "HTTP "
-	}
-	if c.CT {
-		s = s + "CT"
-	}
-	m["status"] = strings.TrimSuffix(s, " ")
-	return m
-}
-
-func NewCertNode(cert *x509.Certificate) *CertNode {
-	certnode := new(CertNode)
-
-	// generate Fingerprint
-	certnode.Fingerprint = sha256.Sum256(cert.Raw)
-
-	// domains
-	// used to ensure uniq entries in domains array
-	domainMap := make(map[string]bool)
-	// add the CommonName just to be safe
-	cn := strings.ToLower(cert.Subject.CommonName)
-	if len(cn) > 0 {
-		domainMap[cn] = true
-	}
-	for _, domain := range cert.DNSNames {
-		if len(domain) > 0 {
-			domain = strings.ToLower(domain)
-			domainMap[domain] = true
-		}
-	}
-	for domain := range domainMap {
-		certnode.Domains = append(certnode.Domains, domain)
-	}
-	sort.Strings(certnode.Domains)
-
-	return certnode
-}
-
-// main graph storage engine
-type CertGraph struct {
-	domains sync.Map
-	certs   sync.Map
-}
-
-func NewCertGraph() *CertGraph {
-	graph := new(CertGraph)
-	return graph
-}
-
-func (graph *CertGraph) LoadOrStoreCert(nodein *CertNode) (*CertNode, bool) {
-	nodeout, ok := graph.certs.LoadOrStore(nodein.Fingerprint, nodein)
-	return nodeout.(*CertNode), ok
-}
-
-// TODO check for existing?
-func (graph *CertGraph) AddCert(certnode *CertNode) {
-	graph.certs.Store(certnode.Fingerprint, certnode)
-}
-
-// TODO check for existing?
-func (graph *CertGraph) AddDomain(domainnode *DomainNode) {
-	graph.domains.Store(domainnode.Domain, domainnode)
-}
-
-func (graph *CertGraph) GetCert(fp fingerprint) (*CertNode, bool) {
-	node, ok := graph.certs.Load(fp)
-	if ok {
-		return node.(*CertNode), true
-	}
-	return nil, false
-}
-
-func (graph *CertGraph) GetDomain(domain string) (*DomainNode, bool) {
-	node, ok := graph.domains.Load(domain)
-	if ok {
-		return node.(*DomainNode), true
-	}
-	return nil, false
-}
-
-func (graph *CertGraph) GetDomainNeighbors(domain string) []string {
-	neighbors := make(map[string]bool)
-
-	//domain = directDomain(domain)
-	node, ok := graph.domains.Load(domain)
-	if ok {
-		domainnode := node.(*DomainNode)
-		// visited cert neighbors
-		node, ok := graph.certs.Load(domainnode.VisitedCert)
-		if ok {
-			certnode := node.(*CertNode)
-			if skipCDN && certnode.CDNCert {
-				v(domain, "-> CDN CERT")
-			} else {
-				for _, neighbor := range certnode.Domains {
-					neighbors[neighbor] = true
-					v(domain, "- CERT ->", neighbor)
-				}
-
-			}
-		}
-
-		// CT neighbors
-		for _, fp := range domainnode.CTCerts {
-			node, ok := graph.certs.Load(fp)
-			if ok {
-				certnode := node.(*CertNode)
-				if skipCDN && certnode.CDNCert {
-					v(domain, "-> CDN CERT")
-				}else {
-						for _, neighbor := range certnode.Domains {
-						neighbors[neighbor] = true
-						v(domain, "-- CT -->", neighbor)
-					}
-				}
-				
-			}
-		}
-	}
-
-	//exclude domain from own neighbors list
-	neighbors[domain] = false
-
-	// convert map to array
-	neighbor_list := make([]string, 0, len(neighbors))
-	for key := range neighbors {
-		if neighbors[key] {
-			neighbor_list = append(neighbor_list, key)
-		}
-	}
-	return neighbor_list
-}
-
-func (graph *CertGraph) GenerateMap() map[string]interface{} {
-	m := make(map[string]interface{})
-	nodes := make([]map[string]string, 0, 2*len(markedDomains))
-	links := make([]map[string]string, 0, 2*len(markedDomains))
-
-
-	// add all domain nodes
-	graph.domains.Range(func(key, value interface{}) bool {
-		domainnode := value.(*DomainNode)
-		nodes = append(nodes, domainnode.ToMap())
-		if domainnode.Status == GOOD {
-			links = append(links, map[string]string{"source": domainnode.Domain, "target": domainnode.VisitedCert.HexString(), "type": "uses"})
-		}
-		return true
-	})
-
-	// add all cert nodes
-	graph.certs.Range(func(key, value interface{}) bool {
-		certnode := value.(*CertNode)
-		nodes = append(nodes, certnode.ToMap())
-		for _, domain := range certnode.Domains {
-			domain := directDomain(domain)
-			_, ok := graph.GetDomain(domain)
-			if ok {
-				links = append(links, map[string]string{"source": certnode.Fingerprint.HexString(), "target": domain, "type": "sans"})
-			}// TODO do something with alt-names that are not in graph like wildcards
-		}
-		return true
-	})
-
-	m["nodes"] = nodes
-	m["links"] = links
-	return m
-}
 
 func generateGraphMetadata() map[string]interface{} {
 	data := make(map[string]interface{})
@@ -350,7 +73,6 @@ func version() string {
 	return fmt.Sprintf("Git commit: %s [%s]", git_date, git_hash)
 
 }
-
 
 func main() {
 	var notls bool
@@ -394,6 +116,10 @@ func main() {
 		flag.Usage()
 		return
 	}
+
+	// set verbose loggin
+	graph.Verbose = verbose
+
 	port = strconv.FormatUint(uint64(*portPtr), 10)
 	timeout = time.Duration(*timeoutPtr) * time.Second
 	startDomains := flag.Args()
@@ -430,43 +156,9 @@ func v(a ...interface{}) {
 	}
 }
 
-// Check for errors, print if network related
-func checkNetErr(err error) domainStatus {
-	if err == nil {
-		return GOOD
-	} else if netError, ok := err.(net.Error); ok && netError.Timeout() {
-		return TIMEOUT
-	} else {
-		switch t := err.(type) {
-		case *net.OpError:
-			if t.Op == "dial" {
-				return NO_HOST
-			} else if t.Op == "read" {
-				return REFUSED
-			}
-		case syscall.Errno:
-			if t == syscall.ECONNREFUSED {
-				return REFUSED
-			}
-		}
-	}
-	return ERROR
-}
-
-// given a domain returns the non-wildcard version of that domain
-func directDomain(domain string) string {
-	if len(domain) < 3 {
-		return domain
-	}
-	if domain[0:2] == "*." {
-		domain = domain[2:]
-	}
-	return domain
-}
-
 // prnts the graph as a json object
 func printJSONGraph() {
-	jsonGraph := graph.GenerateMap()
+	jsonGraph := dgraph.GenerateMap()
 	jsonGraph["certgraph"] = generateGraphMetadata()
 
 	j, err := json.MarshalIndent(jsonGraph, "", "\t")
@@ -480,8 +172,8 @@ func printJSONGraph() {
 // perform Breadth first search to build the graph
 func BFS(roots []string) {
 	var wg sync.WaitGroup
-	domainChan := make(chan *DomainNode, 5)      // input queue
-	domainGraphChan := make(chan *DomainNode, 5) // output queue
+	domainChan := make(chan *graph.DomainNode, 5)      // input queue
+	domainGraphChan := make(chan *graph.DomainNode, 5) // output queue
 
 	// thread limit code
 	threadPass := make(chan bool, parallel)
@@ -492,7 +184,7 @@ func BFS(roots []string) {
 	// put root nodes/domains into queue
 	for _, root := range roots {
 		wg.Add(1)
-		n := NewDomainNode(root, 0)
+		n := graph.NewDomainNode(root, 0)
 		n.Root = true
 		domainChan <- n
 	}
@@ -513,8 +205,8 @@ func BFS(roots []string) {
 
 			if !markedDomains[domainNode.Domain] {
 				markedDomains[domainNode.Domain] = true
-				graph.AddDomain(domainNode)
-				go func(domainNode *DomainNode) {
+				dgraph.AddDomain(domainNode)
+				go func(domainNode *graph.DomainNode) {
 					defer wg.Done()
 					// wait for pass
 					<-threadPass
@@ -524,9 +216,9 @@ func BFS(roots []string) {
 					v("Visiting", domainNode.Depth, domainNode.Domain)
 					BFSVisit(domainNode) // visit
 					domainGraphChan <- domainNode
-					for _, neighbor := range graph.GetDomainNeighbors(domainNode.Domain) {
+					for _, neighbor := range dgraph.GetDomainNeighbors(domainNode.Domain, skipCDN) {
 						wg.Add(1)
-						domainChan <- NewDomainNode(neighbor, domainNode.Depth+1)
+						domainChan <- graph.NewDomainNode(neighbor, domainNode.Depth+1)
 					}
 				}(domainNode)
 			} else {
@@ -542,8 +234,12 @@ func BFS(roots []string) {
 			domainNode, more := <-domainGraphChan
 			if more {
 				if !printJSON {
-					fmt.Fprintln(os.Stdout, domainNode)
-				}else if details {
+					if details {
+						fmt.Fprintln(os.Stdout, domainNode)
+					} else {
+						fmt.Fprintln(os.Stdout, domainNode.Domain)
+					}
+				} else if details {
 					fmt.Fprintln(os.Stderr, domainNode)
 				}
 			} else {
@@ -559,7 +255,7 @@ func BFS(roots []string) {
 }
 
 // visit each node and get and set its neighbors
-func BFSVisit(node *DomainNode) {
+func BFSVisit(node *graph.DomainNode) {
 	if tls_connect {
 		visitTLS(node)
 	}
@@ -569,37 +265,30 @@ func BFSVisit(node *DomainNode) {
 }
 
 // visit nodes by searching certificate transparancy logs
-func visitCT(node *DomainNode) {
+func visitCT(node *graph.DomainNode) {
 	// perform ct search
 	// TODO do pagnation in multiple threads to not block on long searches
-	search_result, err := QueryDomain(node.Domain, false, include_ct_sub)
+	fingerprints, err := google.QueryDomain(node.Domain, false, include_ct_sub)
 	if err != nil {
 		v(err)
 		return
 	}
 
 	// add cert nodes to graph
-	for _, result := range search_result {
+	for _, fp := range fingerprints {
 		// add certnode to graph
-		fp := result.GetFingerprint()
 
-		certnode, exists := graph.GetCert(fp)
+		certnode, exists := dgraph.GetCert(fp)
 
 		if !exists {
 			// get cert details
-			cert_result, err := QueryHash(result.Hash)
+			certnode, err = google.GetCert(fp)
 			if err != nil {
 				v(err)
 				continue
 			}
 
-			certnode = new(CertNode)
-			certnode.Fingerprint = fp
-			certnode.Domains = cert_result.DnsNames
-
-			certnode.CDNCert = CDNCert(cert_result.DnsNames)
-
-			graph.AddCert(certnode)
+			dgraph.AddCert(certnode)
 		}
 
 		certnode.CT = true
@@ -608,7 +297,7 @@ func visitCT(node *DomainNode) {
 }
 
 // visit nodes by connecting to them
-func visitTLS(node *DomainNode) {
+func visitTLS(node *graph.DomainNode) {
 	var certs []*x509.Certificate
 	node.Status, certs = getPeerCerts(node.Domain)
 	if save && len(certs) > 0 {
@@ -619,44 +308,25 @@ func visitTLS(node *DomainNode) {
 		return
 	}
 
-	// TODO iterate over all certs, needs to also update graph.GetDomainNeighbors() too
-	certnode := NewCertNode(certs[0])
-	certnode.CDNCert = CDNCert(certnode.Domains)
+	// TODO iterate over all certs, needs to also update dgraph.GetDomainNeighbors() too
+	certnode := graph.NewCertNode(certs[0])
 
-	certnode, _ = graph.LoadOrStoreCert(certnode)
+	certnode, _ = dgraph.LoadOrStoreCert(certnode)
 
 	certnode.HTTP = true
 	node.VisitedCert = certnode.Fingerprint
 }
 
-// TODO make method on cert object?
-func CDNCert(domains []string) bool {
-	for _, domain := range domains {
-		// cloudflair
-		matched, _ := regexp.MatchString("ssl[0-9]*\\.cloudflaressl\\.com", domain)
-		if matched {
-			return true
-		}
-
-		if domain == "i.ssl.fastly.net" {
-			return true
-		}
-		// TODO include other CDNs
-	}
-	return false
-}
-
-
 // gets the certificats found for a given domain
-func getPeerCerts(host string) (dStatus domainStatus, certs []*x509.Certificate) {
+func getPeerCerts(host string) (dStatus status.DomainStatus, certs []*x509.Certificate) {
 	addr := net.JoinHostPort(host, port)
 	dialer := &net.Dialer{Timeout: timeout}
-	dStatus = ERROR
+	dStatus = status.ERROR
 
 	if starttls {
 		conn, err := dialer.Dial("tcp", addr)
-		dStatus = checkNetErr(err)
-		if dStatus != GOOD {
+		dStatus = status.CheckNetErr(err)
+		if dStatus != status.GOOD {
 			v(dStatus, host)
 			return
 		}
@@ -675,17 +345,17 @@ func getPeerCerts(host string) (dStatus domainStatus, certs []*x509.Certificate)
 		if !ok {
 			return
 		}
-		return GOOD, connState.PeerCertificates
+		return status.GOOD, connState.PeerCertificates
 	} else {
 		conn, err := tls.DialWithDialer(dialer, "tcp", addr, conf)
-		dStatus = checkNetErr(err)
-		if dStatus != GOOD {
+		dStatus = status.CheckNetErr(err)
+		if dStatus != status.GOOD {
 			v(dStatus, host)
 			return
 		}
 		conn.Close()
 		connState := conn.ConnectionState()
-		return GOOD, connState.PeerCertificates
+		return status.GOOD, connState.PeerCertificates
 	}
 }
 
