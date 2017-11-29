@@ -1,3 +1,4 @@
+Gopkg.lock
 certgraph
 build/
 *.json

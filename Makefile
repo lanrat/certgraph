@@ -23,6 +23,9 @@ $(PLATFORMS): $(SOURCES)
 	CGO_ENABLED=0 GOOS=$(os) GOARCH=$(arch) go build $(BUILD_FLAGS) -o 'build/$(os)/$(arch)/certgraph$(ext)' $(SOURCES)
 	cd build/$(os)/$(arch)/; zip -r ../../certgraph-$(os)-$(arch)-$(GIT_DATE).zip .; cd ../../../
 
+dep:
+	dep ensure
+
 fmt:
 	gofmt -s -w -l .
 

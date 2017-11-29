@@ -13,19 +13,23 @@ func (fp *Fingerprint) HexString() string {
 	return fmt.Sprintf("%X", fp)
 }
 
-func FingerprintFromB64(hash string) Fingerprint {
+func FingerprintFromBytes(data []byte) Fingerprint {
 	var fp Fingerprint
-	data, err := base64.StdEncoding.DecodeString(hash)
-	if err != nil {
-		v(err)
-	}
 	if len(data) != sha256.Size {
-		v("Hash is not correct SHA256 size", hash)
+		v("Data is not correct SHA256 size", data)
 	}
 	for i := 0; i < len(data) && i < len(fp); i++ {
 		fp[i] = data[i]
 	}
 	return fp
+}
+
+func FingerprintFromB64(hash string) Fingerprint {
+	data, err := base64.StdEncoding.DecodeString(hash)
+	if err != nil {
+		v(err)
+	}
+	return FingerprintFromBytes(data)
 }
 
 func (fp *Fingerprint) B64Encode() string {

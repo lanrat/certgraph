@@ -3,7 +3,7 @@ package google
 /*
  * This file implements an unofficial API client for Google's
  * Certificate Transparency search
- * https://www.google.com/transparencyreport/https/ct/
+ * https://transparencyreport.google.com/https/certificates
  *
  * As the API is unofficial and has been reverse engineered it may stop working
  * at any time and comes with no guarantees.
@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/lanrat/certgraph/driver"
 	"github.com/lanrat/certgraph/graph"
 )
 
@@ -26,14 +27,23 @@ import (
 const searchURL1 = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certsearch?include_expired=false&include_subdomains=false&domain=example.com"
 const searchURL2 = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certsearch/page?p=DEADBEEF"
 const certURL = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certbyhash?hash=DEADBEEF"
-const MAX_PAGES = 50 // TODO: something better than hard-coding
 
-// global vars
-var jsonClient = &http.Client{Timeout: 10 * time.Second}
+type googleCT struct {
+	max_pages  float64
+	jsonClient *http.Client
+}
+
+func NewGoogleCTDriver() (driver.Driver, error) {
+	d := new(googleCT)
+	d.max_pages = 50 // TODO: make adjustable
+	d.jsonClient = &http.Client{Timeout: 10 * time.Second}
+
+	return d, nil
+}
 
 // gets JSON from url and parses it into target object
-func getJsonP(url string, target interface{}) error {
-	r, err := jsonClient.Get(url)
+func (d *googleCT) getJsonP(url string, target interface{}) error {
+	r, err := d.jsonClient.Get(url)
 	if err != nil {
 		return err
 	}
@@ -52,7 +62,7 @@ func getJsonP(url string, target interface{}) error {
 	return json.Unmarshal(respData, target)
 }
 
-func QueryDomain(domain string, include_expired bool, include_subdomains bool) ([]graph.Fingerprint, error) {
+func (d *googleCT) QueryDomain(domain string, include_expired bool, include_subdomains bool) ([]graph.Fingerprint, error) {
 	results := make([]graph.Fingerprint, 0, 5)
 
 	u, err := url.Parse(searchURL1)
@@ -74,8 +84,8 @@ func QueryDomain(domain string, include_expired bool, include_subdomains bool) (
 	// TODO allow for selective pagnation
 
 	// iterate over results
-	for len(nextURL) > 1 && currentPage <= MAX_PAGES {
-		err = getJsonP(nextURL, &raw)
+	for len(nextURL) > 1 && currentPage <= d.max_pages {
+		err = d.getJsonP(nextURL, &raw)
 		if err != nil {
 			return results, err
 		}
@@ -127,7 +137,7 @@ func QueryDomain(domain string, include_expired bool, include_subdomains bool) (
 	return results, nil
 }
 
-func GetCert(fp graph.Fingerprint) (*graph.CertNode, error) {
+func (d *googleCT) QueryCert(fp graph.Fingerprint) (*graph.CertNode, error) {
 	certnode := new(graph.CertNode)
 	certnode.Fingerprint = fp
 	certnode.Domains = make([]string, 0, 5)
@@ -144,7 +154,7 @@ func GetCert(fp graph.Fingerprint) (*graph.CertNode, error) {
 
 	var raw [][]interface{}
 
-	err = getJsonP(u.String(), &raw)
+	err = d.getJsonP(u.String(), &raw)
 	if err != nil {
 		return certnode, err
 	}
@@ -170,15 +180,15 @@ func GetCert(fp graph.Fingerprint) (*graph.CertNode, error) {
 }
 
 // example function to use Google's CT API
-func CTexample(domain string) error {
-	s, err := QueryDomain(domain, false, false)
+func (d *googleCT) CTexample(domain string) error {
+	s, err := d.QueryDomain(domain, false, false)
 	if err != nil {
 		return err
 	}
 
 	for i := range s {
 		fmt.Println(s[i].HexString(), " ", s[i].B64Encode())
-		cert, err := GetCert(s[i])
+		cert, err := d.QueryCert(s[i])
 		if err != nil {
 			return err
 		}

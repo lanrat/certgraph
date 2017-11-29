@@ -16,7 +16,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lanrat/certgraph/ct/google"
+	"github.com/lanrat/certgraph/driver"
+	"github.com/lanrat/certgraph/driver/crtsh"
+	"github.com/lanrat/certgraph/driver/google"
 	"github.com/lanrat/certgraph/graph"
 	"github.com/lanrat/certgraph/status"
 )
@@ -49,6 +51,8 @@ var include_ct_sub bool
 var tls_connect bool
 var ver bool
 var skipCDN bool
+var crtsh_driver bool
+var ctDriver driver.Driver
 
 func generateGraphMetadata() map[string]interface{} {
 	data := make(map[string]interface{})
@@ -81,6 +85,7 @@ func main() {
 	timeoutPtr := flag.Uint("timeout", 5, "tcp timeout in seconds")
 	flag.BoolVar(&verbose, "verbose", false, "verbose logging")
 	flag.BoolVar(&ct, "ct", false, "use certificate transparancy search to find certificates")
+	flag.BoolVar(&crtsh_driver, "crtsh", false, "use the CRT.sh api instead of Google for CT")
 	flag.BoolVar(&include_ct_sub, "ct-subdomains", false, "include sub-domains in certificate transparancy search")
 	flag.BoolVar(&skipCDN, "skip-cdn", false, "do not crawl into CDN certs")
 	flag.BoolVar(&notls, "notls", false, "don't connect to hosts to collect certificates")
@@ -115,6 +120,20 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Must enter a positive number of parallel threads")
 		flag.Usage()
 		return
+	}
+
+	// TODO better driver support
+	if ct {
+		var err error
+		if crtsh_driver {
+			ctDriver, err = crtsh.NewCRTshDriver()
+		} else {
+			ctDriver, err = google.NewGoogleCTDriver()
+		}
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
 	}
 
 	// set verbose loggin
@@ -268,7 +287,7 @@ func BFSVisit(node *graph.DomainNode) {
 func visitCT(node *graph.DomainNode) {
 	// perform ct search
 	// TODO do pagnation in multiple threads to not block on long searches
-	fingerprints, err := google.QueryDomain(node.Domain, false, include_ct_sub)
+	fingerprints, err := ctDriver.QueryDomain(node.Domain, false, include_ct_sub)
 	if err != nil {
 		v(err)
 		return
@@ -282,7 +301,7 @@ func visitCT(node *graph.DomainNode) {
 
 		if !exists {
 			// get cert details
-			certnode, err = google.GetCert(fp)
+			certnode, err = ctDriver.QueryCert(fp)
 			if err != nil {
 				v(err)
 				continue
