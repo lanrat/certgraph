@@ -13,6 +13,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/lanrat/certgraph/driver/ct"
 	"github.com/lanrat/certgraph/graph"
 	_ "github.com/lib/pq"
@@ -25,9 +27,10 @@ const connStr = "postgresql://guest@crt.sh/certwatch?sslmode=disable"
 type crtsh struct {
 	db          *sql.DB
 	query_limit int
+	timeout     time.Duration
 }
 
-func NewCTDriver(max_query_results int, savePath string) (ct.Driver, error) {
+func NewCTDriver(max_query_results int, timeout time.Duration, savePath string) (ct.Driver, error) {
 	d := new(crtsh)
 	d.query_limit = max_query_results
 	var err error
@@ -39,7 +42,14 @@ func NewCTDriver(max_query_results int, savePath string) (ct.Driver, error) {
 
 	d.db, err = sql.Open("postgres", connStr)
 
+	d.setSQLTimeout(d.timeout.Seconds())
+
 	return d, err
+}
+
+func (d *crtsh) setSQLTimeout(sec float64) error {
+	_, err := d.db.Exec(fmt.Sprintf("SET statement_timeout TO %d;", (1000 * sec)))
+	return err
 }
 
 func (d *crtsh) QueryDomain(domain string, include_expired bool, include_subdomains bool) ([]graph.Fingerprint, error) {
@@ -94,7 +104,7 @@ func (d *crtsh) QueryCert(fp graph.Fingerprint) (*graph.CertNode, error) {
 }
 
 func CTexample(domain string) error {
-	d, err := NewCTDriver(1000, "")
+	d, err := NewCTDriver(1000, time.Duration(10)*time.Second, "")
 	if err != nil {
 		return err
 	}

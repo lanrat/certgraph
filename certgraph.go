@@ -68,7 +68,7 @@ func main() {
 	var ver bool
 	var err error
 	flag.BoolVar(&ver, "version", false, "print version and exit")
-	timeoutPtr := flag.Uint("timeout", 5, "tcp timeout in seconds")
+	timeoutPtr := flag.Uint("timeout", 10, "tcp timeout in seconds")
 	flag.BoolVar(&config.verbose, "verbose", false, "verbose logging")
 	flag.StringVar(&config.driver, "driver", "http", "driver to use [http, smtp, google, crtsh]")
 	flag.BoolVar(&config.include_ct_sub, "ct-subdomains", false, "include sub-domains in certificate transparancy search")
@@ -99,13 +99,19 @@ func main() {
 		return
 	}
 
+	// set verbose logging
+	graph.Verbose = config.verbose
+
+	config.timeout = time.Duration(*timeoutPtr) * time.Second
+	startDomains := flag.Args()
+
 	switch config.driver {
 	case "google":
 		config.ct = true
 		ctDriver, err = google.NewCTDriver(50, config.savePath)
 	case "crtsh":
 		config.ct = true
-		ctDriver, err = crtsh.NewCTDriver(1000, config.savePath)
+		ctDriver, err = crtsh.NewCTDriver(1000, config.timeout, config.savePath)
 	case "http":
 		sslDriver, err = http.NewSSLDriver(config.timeout, config.savePath)
 	case "smtp":
@@ -119,11 +125,6 @@ func main() {
 		return
 	}
 
-	// set verbose logging
-	graph.Verbose = config.verbose
-
-	config.timeout = time.Duration(*timeoutPtr) * time.Second
-	startDomains := flag.Args()
 	for i, domain := range startDomains {
 		startDomains[i] = strings.ToLower(domain)
 	}
