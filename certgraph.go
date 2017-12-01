@@ -1,58 +1,46 @@
 package main
 
 import (
-	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"flag"
 	"fmt"
-	"net"
-	"net/smtp"
 	"os"
-	"path"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/lanrat/certgraph/driver"
-	"github.com/lanrat/certgraph/driver/crtsh"
-	"github.com/lanrat/certgraph/driver/google"
+	"github.com/lanrat/certgraph/driver/ct"
+	"github.com/lanrat/certgraph/driver/ct/crtsh"
+	"github.com/lanrat/certgraph/driver/ct/google"
+	"github.com/lanrat/certgraph/driver/ssl"
+	"github.com/lanrat/certgraph/driver/ssl/http"
+	"github.com/lanrat/certgraph/driver/ssl/smtp"
 	"github.com/lanrat/certgraph/graph"
-	"github.com/lanrat/certgraph/status"
 )
 
-/* TODO
-follow http redirects
-*/
-
 // vars
-var conf = &tls.Config{InsecureSkipVerify: true}
-var markedDomains = make(map[string]bool) // TODO move to graph?
 var dgraph = graph.NewCertGraph()
 var depth uint
-var save bool
 var git_date = "none"
 var git_hash = "DEADBEEF"
 
-// flags
-var port string
-var timeout time.Duration
-var verbose bool
-var maxDepth uint
-var parallel uint
-var starttls bool
-var savePath string
-var details bool
-var printJSON bool
-var ct bool
-var include_ct_sub bool
-var tls_connect bool
-var ver bool
-var skipCDN bool
-var crtsh_driver bool
-var ctDriver driver.Driver
+// driver types
+var ctDriver ct.Driver
+var sslDriver ssl.Driver
+
+var config struct {
+	timeout        time.Duration
+	verbose        bool
+	maxDepth       uint
+	parallel       uint
+	savePath       string
+	details        bool
+	printJSON      bool
+	ct             bool
+	driver         string
+	include_ct_sub bool
+	cdn            bool
+}
 
 func generateGraphMetadata() map[string]interface{} {
 	data := make(map[string]interface{})
@@ -61,14 +49,12 @@ func generateGraphMetadata() map[string]interface{} {
 	data["scan_date"] = time.Now().UTC()
 	data["command"] = strings.Join(os.Args, " ")
 	options := make(map[string]interface{})
-	options["starttls"] = starttls
-	options["parallel"] = parallel
+	options["parallel"] = config.parallel
 	options["depth"] = depth
-	options["tls"] = tls_connect
-	options["ct"] = ct
-	options["ct_subdomains"] = include_ct_sub
-	options["timeout"] = timeout
-	options["port"] = port
+	options["driver"] = config.driver
+	options["ct_subdomains"] = config.include_ct_sub
+	options["cdn"] = config.cdn
+	options["timeout"] = config.timeout
 	data["options"] = options
 	return data
 }
@@ -79,36 +65,27 @@ func version() string {
 }
 
 func main() {
-	var notls bool
+	var ver bool
+	var err error
 	flag.BoolVar(&ver, "version", false, "print version and exit")
-	portPtr := flag.Uint("port", 443, "tcp port to connect to")
 	timeoutPtr := flag.Uint("timeout", 5, "tcp timeout in seconds")
-	flag.BoolVar(&verbose, "verbose", false, "verbose logging")
-	flag.BoolVar(&ct, "ct", false, "use certificate transparancy search to find certificates")
-	flag.BoolVar(&crtsh_driver, "crtsh", false, "use the CRT.sh api instead of Google for CT")
-	flag.BoolVar(&include_ct_sub, "ct-subdomains", false, "include sub-domains in certificate transparancy search")
-	flag.BoolVar(&skipCDN, "skip-cdn", false, "do not crawl into CDN certs")
-	flag.BoolVar(&notls, "notls", false, "don't connect to hosts to collect certificates")
-	flag.UintVar(&maxDepth, "depth", 5, "maximum BFS depth to go")
-	flag.UintVar(&parallel, "parallel", 10, "number of certificates to retrieve in parallel")
-	flag.BoolVar(&starttls, "starttls", false, "connect without TLS and then upgrade with STARTTLS for SMTP, useful with -port 25")
-	flag.BoolVar(&details, "details", false, "print details about the domains crawled")
-	flag.BoolVar(&printJSON, "json", false, "print the graph as json, can be used for graph in web UI")
-	flag.StringVar(&savePath, "save", "", "save certs to folder in PEM formate")
+	flag.BoolVar(&config.verbose, "verbose", false, "verbose logging")
+	flag.StringVar(&config.driver, "driver", "http", "driver to use [http, smtp, google, crtsh]")
+	flag.BoolVar(&config.include_ct_sub, "ct-subdomains", false, "include sub-domains in certificate transparancy search")
+	flag.BoolVar(&config.cdn, "cdn", false, "include certificates from CDNs")
+	flag.UintVar(&config.maxDepth, "depth", 5, "maximum BFS depth to go")
+	flag.UintVar(&config.parallel, "parallel", 10, "number of certificates to retrieve in parallel")
+	flag.BoolVar(&config.details, "details", false, "print details about the domains crawled")
+	flag.BoolVar(&config.printJSON, "json", false, "print the graph as json, can be used for graph in web UI")
+	flag.StringVar(&config.savePath, "save", "", "save certs to folder in PEM formate")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s: [OPTION]... HOST...\n\thttps://github.com/lanrat/certgraph\nOPTIONS:\n", os.Args[0])
 		flag.PrintDefaults()
 	}
 	flag.Parse()
-	tls_connect = !notls
 
 	if ver {
 		fmt.Println(version())
-		return
-	}
-
-	if !ct && !tls_connect {
-		fmt.Fprintln(os.Stderr, "Must allow TLS or CT or both.")
 		return
 	}
 
@@ -116,61 +93,61 @@ func main() {
 		flag.Usage()
 		return
 	}
-	if parallel < 1 {
+	if config.parallel < 1 {
 		fmt.Fprintln(os.Stderr, "Must enter a positive number of parallel threads")
 		flag.Usage()
 		return
 	}
 
-	// TODO better driver support
-	if ct {
-		var err error
-		if crtsh_driver {
-			ctDriver, err = crtsh.NewCRTshDriver()
-		} else {
-			ctDriver, err = google.NewGoogleCTDriver()
-		}
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return
-		}
+	switch config.driver {
+	case "google":
+		config.ct = true
+		ctDriver, err = google.NewCTDriver(50, config.savePath)
+	case "crtsh":
+		config.ct = true
+		ctDriver, err = crtsh.NewCTDriver(1000, config.savePath)
+	case "http":
+		sslDriver, err = http.NewSSLDriver(config.timeout, config.savePath)
+	case "smtp":
+		sslDriver, err = smtp.NewSSLDriver(config.timeout, config.savePath)
+	default:
+		fmt.Fprintln(os.Stderr, "Unknown driver name: "+config.driver)
+		return
+	}
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
 	}
 
-	// set verbose loggin
-	graph.Verbose = verbose
+	// set verbose logging
+	graph.Verbose = config.verbose
 
-	port = strconv.FormatUint(uint64(*portPtr), 10)
-	timeout = time.Duration(*timeoutPtr) * time.Second
+	config.timeout = time.Duration(*timeoutPtr) * time.Second
 	startDomains := flag.Args()
 	for i, domain := range startDomains {
 		startDomains[i] = strings.ToLower(domain)
 	}
-	if len(savePath) > 0 {
-		save = true
-		err := os.MkdirAll(savePath, 0777)
+	if len(config.savePath) > 0 {
+		err := os.MkdirAll(config.savePath, 0777)
 		if err != nil {
 			fmt.Println(err)
-			return
-		}
-		if !tls_connect {
-			fmt.Fprintln(os.Stderr, "Can not save certificates from CT search")
 			return
 		}
 	}
 
 	BFS(startDomains)
 
-	if printJSON {
+	if config.printJSON {
 		printJSONGraph()
 	}
 
-	v("Found", len(markedDomains), "domains")
+	v("Found", dgraph.Len(), "domains")
 	v("Graph Depth:", depth)
 }
 
-// verbose log
+// verbose logging
 func v(a ...interface{}) {
-	if verbose {
+	if config.verbose {
 		fmt.Fprintln(os.Stderr, a...)
 	}
 }
@@ -191,12 +168,13 @@ func printJSONGraph() {
 // perform Breadth first search to build the graph
 func BFS(roots []string) {
 	var wg sync.WaitGroup
+	markedDomains := make(map[string]bool)
 	domainChan := make(chan *graph.DomainNode, 5)      // input queue
 	domainGraphChan := make(chan *graph.DomainNode, 5) // output queue
 
 	// thread limit code
-	threadPass := make(chan bool, parallel)
-	for i := uint(0); i < parallel; i++ {
+	threadPass := make(chan bool, config.parallel)
+	for i := uint(0); i < config.parallel; i++ {
 		threadPass <- true
 	}
 
@@ -213,7 +191,7 @@ func BFS(roots []string) {
 			domainNode := <-domainChan
 
 			// depth check
-			if domainNode.Depth > maxDepth {
+			if domainNode.Depth > config.maxDepth {
 				v("Max depth reached, skipping:", domainNode.Domain)
 				wg.Done()
 				continue
@@ -235,7 +213,7 @@ func BFS(roots []string) {
 					v("Visiting", domainNode.Depth, domainNode.Domain)
 					BFSVisit(domainNode) // visit
 					domainGraphChan <- domainNode
-					for _, neighbor := range dgraph.GetDomainNeighbors(domainNode.Domain, skipCDN) {
+					for _, neighbor := range dgraph.GetDomainNeighbors(domainNode.Domain, config.cdn) {
 						wg.Add(1)
 						domainChan <- graph.NewDomainNode(neighbor, domainNode.Depth+1)
 					}
@@ -252,13 +230,13 @@ func BFS(roots []string) {
 		for {
 			domainNode, more := <-domainGraphChan
 			if more {
-				if !printJSON {
-					if details {
+				if !config.printJSON {
+					if config.details {
 						fmt.Fprintln(os.Stdout, domainNode)
 					} else {
 						fmt.Fprintln(os.Stdout, domainNode.Domain)
 					}
-				} else if details {
+				} else if config.details {
 					fmt.Fprintln(os.Stderr, domainNode)
 				}
 			} else {
@@ -275,11 +253,10 @@ func BFS(roots []string) {
 
 // visit each node and get and set its neighbors
 func BFSVisit(node *graph.DomainNode) {
-	if tls_connect {
-		visitTLS(node)
-	}
-	if ct {
+	if config.ct {
 		visitCT(node)
+	} else {
+		visitSSL(node)
 	}
 }
 
@@ -287,7 +264,7 @@ func BFSVisit(node *graph.DomainNode) {
 func visitCT(node *graph.DomainNode) {
 	// perform ct search
 	// TODO do pagnation in multiple threads to not block on long searches
-	fingerprints, err := ctDriver.QueryDomain(node.Domain, false, include_ct_sub)
+	fingerprints, err := ctDriver.QueryDomain(node.Domain, false, config.include_ct_sub)
 	if err != nil {
 		v(err)
 		return
@@ -310,83 +287,21 @@ func visitCT(node *graph.DomainNode) {
 			dgraph.AddCert(certnode)
 		}
 
-		certnode.CT = true
 		node.AddCTFingerprint(certnode.Fingerprint)
 	}
 }
 
 // visit nodes by connecting to them
-func visitTLS(node *graph.DomainNode) {
-	var certs []*x509.Certificate
-	node.Status, certs = getPeerCerts(node.Domain)
-	if save && len(certs) > 0 {
-		certToPEMFile(certs, path.Join(savePath, node.Domain)+".pem")
-	}
-
-	if len(certs) == 0 {
-		return
-	}
-
-	// TODO iterate over all certs, needs to also update dgraph.GetDomainNeighbors() too
-	certnode := graph.NewCertNode(certs[0])
-
-	certnode, _ = dgraph.LoadOrStoreCert(certnode)
-
-	certnode.HTTP = true
-	node.VisitedCert = certnode.Fingerprint
-}
-
-// gets the certificats found for a given domain
-func getPeerCerts(host string) (dStatus status.DomainStatus, certs []*x509.Certificate) {
-	addr := net.JoinHostPort(host, port)
-	dialer := &net.Dialer{Timeout: timeout}
-	dStatus = status.ERROR
-
-	if starttls {
-		conn, err := dialer.Dial("tcp", addr)
-		dStatus = status.CheckNetErr(err)
-		if dStatus != status.GOOD {
-			v(dStatus, host)
-			return
-		}
-		defer conn.Close()
-		smtp, err := smtp.NewClient(conn, host)
-		if err != nil {
-			v(err)
-			return
-		}
-		err = smtp.StartTLS(conf)
-		if err != nil {
-			v(err)
-			return
-		}
-		connState, ok := smtp.TLSConnectionState()
-		if !ok {
-			return
-		}
-		return status.GOOD, connState.PeerCertificates
-	} else {
-		conn, err := tls.DialWithDialer(dialer, "tcp", addr, conf)
-		dStatus = status.CheckNetErr(err)
-		if dStatus != status.GOOD {
-			v(dStatus, host)
-			return
-		}
-		conn.Close()
-		connState := conn.ConnectionState()
-		return status.GOOD, connState.PeerCertificates
-	}
-}
-
-// function to convert certificats to PEM formate
-func certToPEMFile(certs []*x509.Certificate, file string) {
-	f, err := os.Create(file)
+func visitSSL(node *graph.DomainNode) {
+	dStatus, certnode, err := sslDriver.GetCert(node.Domain)
 	if err != nil {
 		v(err)
-		return
 	}
-	defer f.Close()
-	for _, cert := range certs {
-		pem.Encode(f, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
+	node.Status = dStatus
+
+	if certnode != nil {
+		certnode, _ = dgraph.LoadOrStoreCert(certnode)
+		node.VisitedCert = certnode.Fingerprint
 	}
+
 }

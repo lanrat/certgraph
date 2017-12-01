@@ -15,13 +15,14 @@ ext = $(shell if [ "$(os)" = "windows" ]; then echo ".exe"; fi)
 all: certgraph
 
 release: $(PLATFORMS)
+	rm -r build/bin/
 
 certgraph: $(SOURCES) $(ALL_SOURCES)
 	go build $(BUILD_FLAGS) -o $@ $(SOURCES)
 
 $(PLATFORMS): $(SOURCES)
-	CGO_ENABLED=0 GOOS=$(os) GOARCH=$(arch) go build $(BUILD_FLAGS) -o 'build/$(os)/$(arch)/certgraph$(ext)' $(SOURCES)
-	cd build/$(os)/$(arch)/; zip -r ../../certgraph-$(os)-$(arch)-$(GIT_DATE).zip .; cd ../../../
+	CGO_ENABLED=0 GOOS=$(os) GOARCH=$(arch) go build $(BUILD_FLAGS) -o 'build/bin/$(os)/$(arch)/certgraph$(ext)' $(SOURCES)
+	mkdir -p build/$(GIT_DATE)/; cd build/bin/$(os)/$(arch)/; zip -r ../../../$(GIT_DATE)/certgraph-$(os)-$(arch)-$(GIT_DATE).zip .; cd ../../../
 
 dep:
 	dep ensure

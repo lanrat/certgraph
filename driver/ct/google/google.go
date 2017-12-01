@@ -19,7 +19,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/lanrat/certgraph/driver"
+	"github.com/lanrat/certgraph/driver/ct"
 	"github.com/lanrat/certgraph/graph"
 )
 
@@ -29,14 +29,19 @@ const searchURL2 = "https://transparencyreport.google.com/transparencyreport/api
 const certURL = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certbyhash?hash=DEADBEEF"
 
 type googleCT struct {
-	max_pages  float64
+	max_pages  float64 // this is a float because that is the type automatically decoded from the JSON response
 	jsonClient *http.Client
 }
 
-func NewGoogleCTDriver() (driver.Driver, error) {
+func NewCTDriver(max_query_pages int, savePath string) (ct.Driver, error) {
 	d := new(googleCT)
-	d.max_pages = 50 // TODO: make adjustable
+	d.max_pages = float64(max_query_pages)
 	d.jsonClient = &http.Client{Timeout: 10 * time.Second}
+
+	if len(savePath) > 0 {
+		return d, errors.New("google driver does not support saving")
+
+	}
 
 	return d, nil
 }
@@ -180,7 +185,11 @@ func (d *googleCT) QueryCert(fp graph.Fingerprint) (*graph.CertNode, error) {
 }
 
 // example function to use Google's CT API
-func (d *googleCT) CTexample(domain string) error {
+func CTexample(domain string) error {
+	d, err := NewCTDriver(50, "")
+	if err != nil {
+		return err
+	}
 	s, err := d.QueryDomain(domain, false, false)
 	if err != nil {
 		return err

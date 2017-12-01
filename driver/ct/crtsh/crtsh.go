@@ -1,22 +1,41 @@
 package crtsh
 
+/*
+ * This file implements an unofficial API client for Comodo's
+ * Certificate Transparency search
+ * https://crt.sh/
+ *
+ * As the API is unofficial and has been reverse engineered it may stop working
+ * at any time and comes with no guarantees.
+ */
+
 import (
 	"database/sql"
+	"errors"
 	"fmt"
-	"github.com/lanrat/certgraph/driver"
+	"github.com/lanrat/certgraph/driver/ct"
 	"github.com/lanrat/certgraph/graph"
 	_ "github.com/lib/pq"
 )
 
 const connStr = "postgresql://guest@crt.sh/certwatch?sslmode=disable"
 
+// TODO add timeout option
+
 type crtsh struct {
-	db *sql.DB
+	db          *sql.DB
+	query_limit int
 }
 
-func NewCRTshDriver() (driver.Driver, error) {
+func NewCTDriver(max_query_results int, savePath string) (ct.Driver, error) {
 	d := new(crtsh)
+	d.query_limit = max_query_results
 	var err error
+
+	if len(savePath) > 0 {
+		return d, errors.New("crtsh driver does not support saving yet") // TODO
+
+	}
 
 	d.db, err = sql.Open("postgres", connStr)
 
@@ -26,16 +45,16 @@ func NewCRTshDriver() (driver.Driver, error) {
 func (d *crtsh) QueryDomain(domain string, include_expired bool, include_subdomains bool) ([]graph.Fingerprint, error) {
 	results := make([]graph.Fingerprint, 0, 5)
 
-	queryStr := "SELECT digest(certificate.certificate, 'sha256') sha256 FROM certificate_identity, certificate WHERE certificate.id = certificate_identity.certificate_id AND x509_notAfter(certificate.certificate) > statement_timestamp() AND reverse(lower(certificate_identity.name_value)) LIKE reverse(lower($1))"
+	queryStr := "SELECT digest(certificate.certificate, 'sha256') sha256 FROM certificate_identity, certificate WHERE certificate.id = certificate_identity.certificate_id AND x509_notAfter(certificate.certificate) > statement_timestamp() AND reverse(lower(certificate_identity.name_value)) LIKE reverse(lower($1)) LIMIT $2"
 	if include_expired {
-		queryStr = "SELECT digest(certificate.certificate, 'sha256') sha256 FROM certificate_identity, certificate WHERE certificate.id = certificate_identity.certificate_id AND reverse(lower(certificate_identity.name_value)) LIKE reverse(lower($1))"
+		queryStr = "SELECT digest(certificate.certificate, 'sha256') sha256 FROM certificate_identity, certificate WHERE certificate.id = certificate_identity.certificate_id AND reverse(lower(certificate_identity.name_value)) LIKE reverse(lower($1)) LIMIT $2"
 	}
 
 	if include_subdomains {
 		domain = fmt.Sprintf("%%.%s", domain)
 	}
 
-	rows, err := d.db.Query(queryStr, domain)
+	rows, err := d.db.Query(queryStr, domain, d.query_limit)
 	if err != nil {
 		return results, err
 	}
@@ -74,7 +93,11 @@ func (d *crtsh) QueryCert(fp graph.Fingerprint) (*graph.CertNode, error) {
 	return certnode, nil
 }
 
-func (d *crtsh) CTexample(domain string) error {
+func CTexample(domain string) error {
+	d, err := NewCTDriver(1000, "")
+	if err != nil {
+		return err
+	}
 	s, err := d.QueryDomain(domain, false, false)
 	if err != nil {
 		return err

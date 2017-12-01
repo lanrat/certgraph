@@ -54,7 +54,7 @@ func (graph *CertGraph) GetDomain(domain string) (*DomainNode, bool) {
 	return nil, false
 }
 
-func (graph *CertGraph) GetDomainNeighbors(domain string, skipCDN bool) []string {
+func (graph *CertGraph) GetDomainNeighbors(domain string, cdn bool) []string {
 	neighbors := make(map[string]bool)
 
 	//domain = directDomain(domain)
@@ -65,12 +65,12 @@ func (graph *CertGraph) GetDomainNeighbors(domain string, skipCDN bool) []string
 		node, ok := graph.certs.Load(domainnode.VisitedCert)
 		if ok {
 			certnode := node.(*CertNode)
-			if skipCDN && certnode.CDNCert() {
-				v(domain, "-> CDN CERT")
+			if !cdn && certnode.CDNCert() {
+				//v(domain, "-> CDN CERT")
 			} else {
 				for _, neighbor := range certnode.Domains {
 					neighbors[neighbor] = true
-					v(domain, "- CERT ->", neighbor)
+					//v(domain, "- CERT ->", neighbor)
 				}
 
 			}
@@ -81,12 +81,12 @@ func (graph *CertGraph) GetDomainNeighbors(domain string, skipCDN bool) []string
 			node, ok := graph.certs.Load(fp)
 			if ok {
 				certnode := node.(*CertNode)
-				if skipCDN && certnode.CDNCert() {
-					v(domain, "-> CDN CERT")
+				if !cdn && certnode.CDNCert() {
+					//v(domain, "-> CDN CERT")
 				} else {
 					for _, neighbor := range certnode.Domains {
 						neighbors[neighbor] = true
-						v(domain, "-- CT -->", neighbor)
+						//v(domain, "-- CT -->", neighbor)
 					}
 				}
 
