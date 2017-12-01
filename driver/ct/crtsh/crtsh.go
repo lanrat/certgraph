@@ -11,11 +11,12 @@ package crtsh
 
 import (
 	"database/sql"
-	"errors"
 	"fmt"
+	"path"
 	"time"
 
 	"github.com/lanrat/certgraph/driver/ct"
+	"github.com/lanrat/certgraph/driver/ssl"
 	"github.com/lanrat/certgraph/graph"
 	_ "github.com/lib/pq"
 )
@@ -28,6 +29,8 @@ type crtsh struct {
 	db          *sql.DB
 	query_limit int
 	timeout     time.Duration
+	save        bool
+	savePath    string
 }
 
 func NewCTDriver(max_query_results int, timeout time.Duration, savePath string) (ct.Driver, error) {
@@ -36,8 +39,8 @@ func NewCTDriver(max_query_results int, timeout time.Duration, savePath string) 
 	var err error
 
 	if len(savePath) > 0 {
-		return d, errors.New("crtsh driver does not support saving yet") // TODO
-
+		d.save = true
+		d.savePath = savePath
 	}
 
 	d.db, err = sql.Open("postgres", connStr)
@@ -98,6 +101,18 @@ func (d *crtsh) QueryCert(fp graph.Fingerprint) (*graph.CertNode, error) {
 		var domain string
 		rows.Scan(&domain)
 		certnode.Domains = append(certnode.Domains, domain)
+	}
+
+	if d.save {
+		var raw_cert []byte
+		queryStr = "SELECT certificate.certificate FROM certificate WHERE digest(certificate.certificate, 'sha256') = $1"
+		row := d.db.QueryRow(queryStr, fp[:])
+		err = row.Scan(&raw_cert)
+		if err != nil {
+			return certnode, err
+		}
+
+		ssl.RawCertToPEMFile(raw_cert, path.Join(d.savePath, fp.HexString())+".pem")
 	}
 
 	return certnode, nil

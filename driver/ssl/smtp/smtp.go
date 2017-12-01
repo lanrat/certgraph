@@ -64,7 +64,7 @@ func (d *smtpDriver) GetCert(host string) (status.DomainStatus, *graph.CertNode,
 	}
 
 	if d.save && len(connState.PeerCertificates) > 0 {
-		ssl.CertToPEMFile(connState.PeerCertificates, path.Join(d.savePath, host)+".pem")
+		ssl.CertsToPEMFile(connState.PeerCertificates, path.Join(d.savePath, host)+".pem")
 	}
 
 	// TODO iterate over all certs, needs to also update dgraph.GetDomainNeighbors() too
