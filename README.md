@@ -3,42 +3,56 @@
 
 CertGraph crawls SSL certificates creating a directed graph where each domain is a node and the certificate alternative names for that domain's certificate are the edges to other domain nodes. New domains are printed as they are found. In Detailed mode upon completion the Graph's adjacency list is printed.
 
-Crawling defaults to collectng certificate by connecting over TCP, however the `--ct` flag will use [Google's Certificate Transparency search](https://www.google.com/transparencyreport/https/ct/) to find additional certificates and domains.
+Crawling defaults to collectng certificate by connecting over TCP, however there are multiple drivers that can search [Certificate Transparency](https://www.certificate-transparency.org/) logs.
 
 This tool was designed to be used for host name enumeration via SSL certificates, but it can also show you a "chain" of trust between domains and the certificates that re-used between them.
 
 ## Usage
 ```
 Usage of ./certgraph: [OPTION]... HOST...
-  -ct
-        use certificate transparancy search to find certificates
+        https://github.com/lanrat/certgraph
+OPTIONS:
+  -cdn
+        include certificates from CDNs
+  -ct-subdomains
+        include sub-domains in certificate transparancy search
   -depth uint
-        maximum BFS depth to go, default: 20 (default 20)
+        maximum BFS depth to go (default 5)
   -details
         print details about the domains crawled
+  -driver string
+        driver to use [http, smtp, google, crtsh] (default "http")
   -json
         print the graph as json, can be used for graph in web UI
-  -notls
-        don't connect to hosts to collect certificates
   -parallel uint
-        number of certificates to retrieve in parallel, default: 10 (default 10)
-  -port uint
-        tcp port to connect to (default 443)
+        number of certificates to retrieve in parallel (default 10)
   -save string
         save certs to folder in PEM formate
-  -starttls
-        connect without TLS and then upgrade with STARTTLS for SMTP, useful with -port 25
   -timeout uint
-        tcp timeout in seconds (default 5)
+        tcp timeout in seconds (default 10)
   -verbose
         verbose logging
   -version
         print version and exit
+
 ```
+
+## Drivers
+
+CertGraph has multiple options for querying SSL certificates. The driver is responsible for retrieving the certificates for a given domain. Currently there are the following drivers:
+
+ * **http** this is the default driver which works by connecting to the hosts over HTTPS and retrieving the certificates from the SSL connection
+ 
+ * **smtp** like the *http* driver, but connects over port 25 and issues the *starttls* command to retrieve the certificates from the SSL connection
+
+ * **crtsh** this driver searches Certificate Transparency logs via [crt.sh](https://crt.sh/). No packets are sent to any of the domains when using this driver
+
+ * **google** this is another Certificate Transparency driver that behaves like *crtsh* but uses the [Googe Certificate Transparency Lookup Tool](https://transparencyreport.google.com/https/certificates)
+
 
 ## Example
 ```
-$ ./certgraph --details eff.org
+$ ./certgraph -details eff.org
 eff.org 0       Good    42E3E4605D8BB4608EB64936E2176A98B97EBF2E0F8F93A64A6640713C7D4325
 maps.eff.org    1       Good    42E3E4605D8BB4608EB64936E2176A98B97EBF2E0F8F93A64A6640713C7D4325
 https-everywhere-atlas.eff.org  1       Good    42E3E4605D8BB4608EB64936E2176A98B97EBF2E0F8F93A64A6640713C7D4325
@@ -55,9 +69,11 @@ Precompiled releases will occasionally be uploaded to the [releases github page]
 
 ## Compiling
 
-To compile certgraph you must have a working go 1.9 or newer compiler on your system.
+To compile certgraph you must have a working go 1.9 or newer compiler on your system, as well as the golang [dep](https://github.com/golang/dep) dependency management tool.
 To compile for the running system compilation is as easy as running make
 ```
+certgraph$ make dep
+dep ensure
 certgraph$ make
 go build -o certgraph certgraph.go
 ```
