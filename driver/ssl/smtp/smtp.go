@@ -20,8 +20,6 @@ type smtpDriver struct {
 	timeout  time.Duration
 }
 
-// TODO lookup MX records for domains
-
 func NewSSLDriver(timeout time.Duration, savePath string) (ssl.Driver, error) {
 	d := new(smtpDriver)
 	d.port = "25"

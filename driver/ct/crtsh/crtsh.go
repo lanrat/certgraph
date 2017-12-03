@@ -23,8 +23,6 @@ import (
 
 const connStr = "postgresql://guest@crt.sh/certwatch?sslmode=disable"
 
-// TODO add timeout option
-
 type crtsh struct {
 	db          *sql.DB
 	query_limit int
