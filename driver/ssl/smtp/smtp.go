@@ -73,45 +73,14 @@ func (d *smtpDriver) GetCert(host string) (status.DomainStatus, *graph.CertNode,
 	return status.GOOD, certnode, nil
 }
 
-/*
-// gets the certificats found for a given domain
-func (d *smtpDriver) getPeerCerts(host string) (dStatus status.DomainStatus, certs []*x509.Certificate) {
-    addr := net.JoinHostPort(host, port)
-    dialer := &net.Dialer{Timeout: timeout}
-    dStatus = status.ERROR
-
-    if d.starttls {
-        conn, err := dialer.Dial("tcp", addr)
-        dStatus = status.CheckNetErr(err)
-        if dStatus != status.GOOD {
-            v(dStatus, host)
-            return
-        }
-        defer conn.Close()
-        smtp, err := smtp.NewClient(conn, host)
-        if err != nil {
-            v(err)
-            return
-        }
-        err = smtp.StartTLS(conf)
-        if err != nil {
-            v(err)
-            return
-        }
-        connState, ok := smtp.TLSConnectionState()
-        if !ok {
-            return
-        }
-        return status.GOOD, connState.PeerCertificates
-    } else {
-        conn, err := tls.DialWithDialer(dialer, "tcp", addr, conf)
-        dStatus = status.CheckNetErr(err)
-        if dStatus != status.GOOD {
-            v(dStatus, host)
-            return
-        }
-        conn.Close()
-        connState := conn.ConnectionState()
-        return status.GOOD, connState.PeerCertificates
+func GetMX(domain string) ([]string, error) {
+    domains := make([]string, 0, 5)
+    mx, err := net.LookupMX(domain)
+    if err != nil {
+        return domains, err
     }
-}*/
+    for _, v := range mx {
+        domains = append(domains, v.Host)
+    }
+    return domains, nil
+}

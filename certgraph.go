@@ -116,6 +116,12 @@ func main() {
 		sslDriver, err = http.NewSSLDriver(config.timeout, config.savePath)
 	case "smtp":
 		sslDriver, err = smtp.NewSSLDriver(config.timeout, config.savePath)
+		for _, domain := range startDomains {
+			mx, err := smtp.GetMX(domain)
+			if err == nil {
+				startDomains = append(startDomains, mx...)
+			}
+		}
 	default:
 		fmt.Fprintln(os.Stderr, "Unknown driver name: "+config.driver)
 		return

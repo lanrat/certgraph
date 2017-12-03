@@ -90,7 +90,7 @@ func (d *crtsh) QueryCert(fp graph.Fingerprint) (*graph.CertNode, error) {
 	certnode.Domains = make([]string, 0, 5)
 	certnode.CT = true
 
-	queryStr := "SELECT DISTINCT certificate_identity.name_value FROM certificate, certificate_identity WHERE certificate.id = certificate_identity.certificate_id AND  name_type in ('dNSName', 'commonName') AND digest(certificate.certificate, 'sha256') = $1"
+	queryStr := "SELECT DISTINCT certificate_identity.name_value FROM certificate, certificate_identity WHERE certificate.id = certificate_identity.certificate_id AND  certificate_identity.name_type in ('dNSName', 'commonName') AND digest(certificate.certificate, 'sha256') = $1"
 
 	rows, err := d.db.Query(queryStr, fp[:])
 	if err != nil {
