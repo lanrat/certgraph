@@ -34,6 +34,14 @@ func NewDomainNode(domain string, depth uint) *DomainNode {
 // get the string representation of a node
 func (d *DomainNode) String() string {
 	cert := ""
+	// CT
+ 	if len(d.CTCerts) > 0 {
+		for i := range d.CTCerts {
+			cert = fmt.Sprintf("%s %s", cert, d.CTCerts[i].HexString())
+		}
+		return fmt.Sprintf("%s\t%d\t%s", d.Domain, d.Depth, cert)
+	}
+	// non-ct
 	if d.Status == status.GOOD {
 		cert = d.VisitedCert.HexString()
 	}

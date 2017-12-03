@@ -10,7 +10,7 @@ type Fingerprint [sha256.Size]byte
 
 // print fingerprint as hex
 func (fp *Fingerprint) HexString() string {
-	return fmt.Sprintf("%X", fp)
+	return fmt.Sprintf("%X", *fp)
 }
 
 func FingerprintFromBytes(data []byte) Fingerprint {
