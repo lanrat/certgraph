@@ -36,4 +36,4 @@ clean:
 serv:
 	(cd docs; python -m SimpleHTTPServer)
 
-.PHONY: all fmt clean release serv $(PLATFORMS)
+.PHONY: all fmt clean release serv dep $(PLATFORMS)
