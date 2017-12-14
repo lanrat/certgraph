@@ -10,31 +10,32 @@ This tool was designed to be used for host name enumeration via SSL certificates
 ## Usage
 ```
 Usage of ./certgraph: [OPTION]... HOST...
-        https://github.com/lanrat/certgraph
+  https://github.com/lanrat/certgraph
 OPTIONS:
   -cdn
-        include certificates from CDNs
+      include certificates from CDNs
+  -ct-expired
+      include expired certificates in certificate transparancy search
   -ct-subdomains
-        include sub-domains in certificate transparancy search
+      include sub-domains in certificate transparancy search
   -depth uint
-        maximum BFS depth to go (default 5)
+      maximum BFS depth to go (default 5)
   -details
-        print details about the domains crawled
+      print details about the domains crawled
   -driver string
-        driver to use [http, smtp, google, crtsh] (default "http")
+      driver to use [http, smtp, google, crtsh] (default "http")
   -json
-        print the graph as json, can be used for graph in web UI
+      print the graph as json, can be used for graph in web UI
   -parallel uint
-        number of certificates to retrieve in parallel (default 10)
+      number of certificates to retrieve in parallel (default 10)
   -save string
-        save certs to folder in PEM formate
+      save certs to folder in PEM formate
   -timeout uint
-        tcp timeout in seconds (default 10)
+      tcp timeout in seconds (default 10)
   -verbose
-        verbose logging
+      verbose logging
   -version
-        print version and exit
-
+      print version and exit
 ```
 
 ## Drivers

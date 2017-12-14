@@ -35,7 +35,7 @@ func NewDomainNode(domain string, depth uint) *DomainNode {
 func (d *DomainNode) String() string {
 	cert := ""
 	// CT
- 	if len(d.CTCerts) > 0 {
+	if len(d.CTCerts) > 0 {
 		for i := range d.CTCerts {
 			cert = fmt.Sprintf("%s %s", cert, d.CTCerts[i].HexString())
 		}

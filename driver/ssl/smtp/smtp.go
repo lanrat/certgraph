@@ -72,13 +72,13 @@ func (d *smtpDriver) GetCert(host string) (status.DomainStatus, *graph.CertNode,
 }
 
 func GetMX(domain string) ([]string, error) {
-    domains := make([]string, 0, 5)
-    mx, err := net.LookupMX(domain)
-    if err != nil {
-        return domains, err
-    }
-    for _, v := range mx {
-        domains = append(domains, v.Host)
-    }
-    return domains, nil
+	domains := make([]string, 0, 5)
+	mx, err := net.LookupMX(domain)
+	if err != nil {
+		return domains, err
+	}
+	for _, v := range mx {
+		domains = append(domains, v.Host)
+	}
+	return domains, nil
 }

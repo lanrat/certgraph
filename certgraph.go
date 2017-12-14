@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -106,7 +108,15 @@ func main() {
 	graph.Verbose = config.verbose
 
 	config.timeout = time.Duration(*timeoutPtr) * time.Second
-	startDomains := flag.Args()
+	startDomains := make([]string, 0, 1)
+
+	for _, domain := range flag.Args() {
+		d := cleanHostName(strings.ToLower(domain))
+		if len(d) > 0 {
+			startDomains = append(startDomains, d)
+			v("clean", d)
+		}
+	}
 
 	switch config.driver {
 	case "google":
@@ -134,9 +144,6 @@ func main() {
 		return
 	}
 
-	for i, domain := range startDomains {
-		startDomains[i] = strings.ToLower(domain)
-	}
 	if len(config.savePath) > 0 {
 		err := os.MkdirAll(config.savePath, 0777)
 		if err != nil {
@@ -313,5 +320,23 @@ func visitSSL(node *graph.DomainNode) {
 		certnode, _ = dgraph.LoadOrStoreCert(certnode)
 		node.VisitedCert = certnode.Fingerprint
 	}
+}
 
+// sanitize the input to accept urls
+func cleanHostName(host string) string {
+	u, err := url.Parse(host)
+	if err != nil {
+		v(err)
+		return ""
+	}
+	host = u.Host
+
+	if strings.Contains(host, ":") {
+		host, _, err = net.SplitHostPort(host)
+		if err != nil {
+			v(err)
+			return ""
+		}
+	}
+	return host
 }
