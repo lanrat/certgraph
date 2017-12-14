@@ -39,6 +39,7 @@ var config struct {
 	ct             bool
 	driver         string
 	include_ct_sub bool
+	include_ct_exp bool
 	cdn            bool
 }
 
@@ -53,6 +54,7 @@ func generateGraphMetadata() map[string]interface{} {
 	options["depth"] = depth
 	options["driver"] = config.driver
 	options["ct_subdomains"] = config.include_ct_sub
+	options["ct_expired"] = config.include_ct_exp
 	options["cdn"] = config.cdn
 	options["timeout"] = config.timeout
 	data["options"] = options
@@ -72,6 +74,7 @@ func main() {
 	flag.BoolVar(&config.verbose, "verbose", false, "verbose logging")
 	flag.StringVar(&config.driver, "driver", "http", "driver to use [http, smtp, google, crtsh]")
 	flag.BoolVar(&config.include_ct_sub, "ct-subdomains", false, "include sub-domains in certificate transparancy search")
+	flag.BoolVar(&config.include_ct_exp, "ct-expired", false, "include expired certificates in certificate transparancy search")
 	flag.BoolVar(&config.cdn, "cdn", false, "include certificates from CDNs")
 	flag.UintVar(&config.maxDepth, "depth", 5, "maximum BFS depth to go")
 	flag.UintVar(&config.parallel, "parallel", 10, "number of certificates to retrieve in parallel")
@@ -271,7 +274,7 @@ func BFSVisit(node *graph.DomainNode) {
 func visitCT(node *graph.DomainNode) {
 	// perform ct search
 	// TODO do pagnation in multiple threads to not block on long searches
-	fingerprints, err := ctDriver.QueryDomain(node.Domain, false, config.include_ct_sub)
+	fingerprints, err := ctDriver.QueryDomain(node.Domain, config.include_ct_exp, config.include_ct_sub)
 	if err != nil {
 		v(err)
 		return
