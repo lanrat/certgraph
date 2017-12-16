@@ -38,6 +38,9 @@ endif
 fmt:
 	gofmt -s -w -l .
 
+install: $(SOURCES) $(ALL_SOURCES)
+	go install $(BUILD_FLAGS)
+
 clean:
 	rm -r certgraph build/
 

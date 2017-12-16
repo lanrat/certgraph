@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"net"
-	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -111,7 +109,8 @@ func main() {
 	startDomains := make([]string, 0, 1)
 
 	for _, domain := range flag.Args() {
-		d := cleanHostName(strings.ToLower(domain))
+		d := strings.ToLower(domain)
+		v("cleaned", domain, d)
 		if len(d) > 0 {
 			startDomains = append(startDomains, d)
 			v("clean", d)
@@ -320,23 +319,4 @@ func visitSSL(node *graph.DomainNode) {
 		certnode, _ = dgraph.LoadOrStoreCert(certnode)
 		node.VisitedCert = certnode.Fingerprint
 	}
-}
-
-// sanitize the input to accept urls
-func cleanHostName(host string) string {
-	u, err := url.Parse(host)
-	if err != nil {
-		v(err)
-		return ""
-	}
-	host = u.Host
-
-	if strings.Contains(host, ":") {
-		host, _, err = net.SplitHostPort(host)
-		if err != nil {
-			v(err)
-			return ""
-		}
-	}
-	return host
 }
