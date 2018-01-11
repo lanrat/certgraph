@@ -79,6 +79,11 @@ certgraph$ make
 go build -o certgraph certgraph.go
 ```
 
+Alternatively you can use `go get` to install with this one-liner:
+```
+go get -u github.com/lanrat/certgraph
+```
+
 ## [Web UI](https://lanrat.github.io/certgraph/)
 
 A web UI is provided in the docs folder and is accessable at the github pages url [https://lanrat.github.io/certgraph/](https://lanrat.github.io/certgraph/).
