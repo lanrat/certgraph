@@ -90,7 +90,7 @@ func (c *CertNode) CDNCert() bool {
 			return true
 		}
 
-		if domain == "i.ssl.fastly.net" {
+		if strings.HasSuffix(domain, "fastly.net") {
 			return true
 		}
 		// TODO include other CDNs

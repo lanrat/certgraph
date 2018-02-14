@@ -63,7 +63,6 @@ func generateGraphMetadata() map[string]interface{} {
 
 func version() string {
 	return fmt.Sprintf("Git commit: %s [%s]", git_date, git_hash)
-
 }
 
 func main() {
@@ -110,10 +109,8 @@ func main() {
 
 	for _, domain := range flag.Args() {
 		d := strings.ToLower(domain)
-		v("cleaned", domain, d)
 		if len(d) > 0 {
 			startDomains = append(startDomains, d)
-			v("clean", d)
 		}
 	}
 
