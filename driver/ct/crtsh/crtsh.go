@@ -56,9 +56,40 @@ func (d *crtsh) setSQLTimeout(sec float64) error {
 func (d *crtsh) QueryDomain(domain string, include_expired bool, include_subdomains bool) ([]graph.Fingerprint, error) {
 	results := make([]graph.Fingerprint, 0, 5)
 
-	queryStr := "SELECT digest(certificate.certificate, 'sha256') sha256 FROM certificate_identity, certificate WHERE certificate.id = certificate_identity.certificate_id AND x509_notAfter(certificate.certificate) > statement_timestamp() AND reverse(lower(certificate_identity.name_value)) LIKE reverse(lower($1)) LIMIT $2"
-	if include_expired {
-		queryStr = "SELECT digest(certificate.certificate, 'sha256') sha256 FROM certificate_identity, certificate WHERE certificate.id = certificate_identity.certificate_id AND reverse(lower(certificate_identity.name_value)) LIKE reverse(lower($1)) LIMIT $2"
+	queryStr := ""
+
+	if include_subdomains {
+		if include_expired {
+			queryStr = `SELECT digest(certificate.certificate, 'sha256') sha256
+					FROM certificate_identity, certificate
+					WHERE certificate.id = certificate_identity.certificate_id
+					AND (reverse(lower(certificate_identity.name_value)) LIKE reverse(lower('%%.'||$1))
+                	OR reverse(lower(certificate_identity.name_value)) LIKE reverse(lower($1)))
+					LIMIT $2`
+		} else {
+			queryStr = `SELECT digest(certificate.certificate, 'sha256') sha256
+					FROM certificate_identity, certificate
+					WHERE certificate.id = certificate_identity.certificate_id
+					AND x509_notAfter(certificate.certificate) > statement_timestamp()
+					AND (reverse(lower(certificate_identity.name_value)) LIKE reverse(lower('%%.'||$1))
+                	OR reverse(lower(certificate_identity.name_value)) LIKE reverse(lower($1)))
+					LIMIT $2`
+		}
+	} else {
+		if include_expired {
+			queryStr = `SELECT digest(certificate.certificate, 'sha256') sha256
+					FROM certificate_identity, certificate
+					WHERE certificate.id = certificate_identity.certificate_id
+					AND reverse(lower(certificate_identity.name_value)) LIKE reverse(lower($1))
+					LIMIT $2`
+		} else {
+			queryStr = `SELECT digest(certificate.certificate, 'sha256') sha256
+					FROM certificate_identity, certificate
+					WHERE certificate.id = certificate_identity.certificate_id
+					AND x509_notAfter(certificate.certificate) > statement_timestamp()
+					AND reverse(lower(certificate_identity.name_value)) LIKE reverse(lower($1))
+					LIMIT $2`
+		}
 	}
 
 	if include_subdomains {
@@ -88,7 +119,11 @@ func (d *crtsh) QueryCert(fp graph.Fingerprint) (*graph.CertNode, error) {
 	certnode.Domains = make([]string, 0, 5)
 	certnode.CT = true
 
-	queryStr := "SELECT DISTINCT certificate_identity.name_value FROM certificate, certificate_identity WHERE certificate.id = certificate_identity.certificate_id AND  certificate_identity.name_type in ('dNSName', 'commonName') AND digest(certificate.certificate, 'sha256') = $1"
+	queryStr := `SELECT DISTINCT certificate_identity.name_value
+				FROM certificate, certificate_identity
+				WHERE certificate.id = certificate_identity.certificate_id
+				AND certificate_identity.name_type in ('dNSName', 'commonName')
+				AND digest(certificate.certificate, 'sha256') = $1`
 
 	rows, err := d.db.Query(queryStr, fp[:])
 	if err != nil {
@@ -103,7 +138,9 @@ func (d *crtsh) QueryCert(fp graph.Fingerprint) (*graph.CertNode, error) {
 
 	if d.save {
 		var raw_cert []byte
-		queryStr = "SELECT certificate.certificate FROM certificate WHERE digest(certificate.certificate, 'sha256') = $1"
+		queryStr = `SELECT certificate.certificate
+					FROM certificate
+					WHERE digest(certificate.certificate, 'sha256') = $1`
 		row := d.db.QueryRow(queryStr, fp[:])
 		err = row.Scan(&raw_cert)
 		if err != nil {
