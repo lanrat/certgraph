@@ -7,6 +7,8 @@ Crawling defaults to collectng certificate by connecting over TCP, however there
 
 This tool was designed to be used for host name enumeration via SSL certificates, but it can also show you a "chain" of trust between domains and the certificates that re-used between them.
 
+[Blog post with more information](https://lanrat.com/certgraph/)
+
 ## Usage
 ```
 Usage of ./certgraph: [OPTION]... HOST...
