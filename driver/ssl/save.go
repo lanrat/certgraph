@@ -6,7 +6,7 @@ import (
 	"os"
 )
 
-// function to convert certificats to PEM formate
+// CertsToPEMFile saves certificates to local pem file
 func CertsToPEMFile(certs []*x509.Certificate, file string) error {
 	f, err := os.Create(file)
 	if err != nil {
@@ -19,6 +19,7 @@ func CertsToPEMFile(certs []*x509.Certificate, file string) error {
 	return nil
 }
 
+// RawCertToPEMFile saves raw certificate to local pem file
 func RawCertToPEMFile(cert []byte, file string) error {
 	f, err := os.Create(file)
 	if err != nil {

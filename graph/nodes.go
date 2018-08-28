@@ -12,7 +12,7 @@ import (
 	"github.com/lanrat/certgraph/status"
 )
 
-// structure to store a domain and its edges
+// DomainNode structure to store a domain and its edges
 type DomainNode struct {
 	Domain      string
 	Depth       uint
@@ -22,7 +22,7 @@ type DomainNode struct {
 	Root        bool
 }
 
-// constructor for DomainNode, converts domain to directDomain
+// NewDomainNode constructor for DomainNode, converts domain to directDomain
 func NewDomainNode(domain string, depth uint) *DomainNode {
 	node := new(DomainNode)
 	node.Domain = directDomain(domain)
@@ -48,10 +48,12 @@ func (d *DomainNode) String() string {
 	return fmt.Sprintf("%s\t%d\t%s\t%s", d.Domain, d.Depth, d.Status, cert)
 }
 
+// AddCTFingerprint appends a CT Fingerprint to the DomainNode
 func (d *DomainNode) AddCTFingerprint(fp Fingerprint) {
 	d.CTCerts = append(d.CTCerts, fp)
 }
 
+// ToMap returns a map of the DomainNode's fields (weak serialization)
 func (d *DomainNode) ToMap() map[string]string {
 	m := make(map[string]string)
 	m["type"] = "domain"
@@ -62,6 +64,7 @@ func (d *DomainNode) ToMap() map[string]string {
 	return m
 }
 
+// CertNode graph not to store certificate information
 type CertNode struct {
 	Fingerprint Fingerprint
 	Domains     []string
@@ -82,6 +85,7 @@ func (c *CertNode) String() string {
 	return fmt.Sprintf("%s\t%s %s\t%v", c.Fingerprint.HexString(), http, ct, c.Domains)
 }
 
+// CDNCert returns true if we think the certificate belongs to a CDN
 func (c *CertNode) CDNCert() bool {
 	for _, domain := range c.Domains {
 		// cloudflair
@@ -98,6 +102,7 @@ func (c *CertNode) CDNCert() bool {
 	return false
 }
 
+// ToMap returns a map of the CertNode's fields (weak serialization)
 func (c *CertNode) ToMap() map[string]string {
 	m := make(map[string]string)
 	m["type"] = "certificate"
@@ -113,6 +118,7 @@ func (c *CertNode) ToMap() map[string]string {
 	return m
 }
 
+// NewCertNode creates a CertNode from the provided certificate
 func NewCertNode(cert *x509.Certificate) *CertNode {
 	certnode := new(CertNode)
 

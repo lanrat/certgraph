@@ -3,7 +3,7 @@
 
 CertGraph crawls SSL certificates creating a directed graph where each domain is a node and the certificate alternative names for that domain's certificate are the edges to other domain nodes. New domains are printed as they are found. In Detailed mode upon completion the Graph's adjacency list is printed.
 
-Crawling defaults to collectng certificate by connecting over TCP, however there are multiple drivers that can search [Certificate Transparency](https://www.certificate-transparency.org/) logs.
+Crawling defaults to collecting certificate by connecting over TCP, however there are multiple drivers that can search [Certificate Transparency](https://www.certificate-transparency.org/) logs.
 
 This tool was designed to be used for host name enumeration via SSL certificates, but it can also show you a "chain" of trust between domains and the certificates that re-used between them.
 
@@ -17,9 +17,9 @@ OPTIONS:
   -cdn
       include certificates from CDNs
   -ct-expired
-      include expired certificates in certificate transparancy search
+      include expired certificates in certificate transparency search
   -ct-subdomains
-      include sub-domains in certificate transparancy search
+      include sub-domains in certificate transparency search
   -depth uint
       maximum BFS depth to go (default 5)
   -details
@@ -31,7 +31,7 @@ OPTIONS:
   -parallel uint
       number of certificates to retrieve in parallel (default 10)
   -save string
-      save certs to folder in PEM formate
+      save certs to folder in PEM format
   -timeout uint
       tcp timeout in seconds (default 10)
   -verbose
@@ -50,7 +50,7 @@ CertGraph has multiple options for querying SSL certificates. The driver is resp
 
  * **crtsh** this driver searches Certificate Transparency logs via [crt.sh](https://crt.sh/). No packets are sent to any of the domains when using this driver
 
- * **google** this is another Certificate Transparency driver that behaves like *crtsh* but uses the [Googe Certificate Transparency Lookup Tool](https://transparencyreport.google.com/https/certificates)
+ * **google** this is another Certificate Transparency driver that behaves like *crtsh* but uses the [Google Certificate Transparency Lookup Tool](https://transparencyreport.google.com/https/certificates)
 
 
 ## Example
@@ -88,7 +88,7 @@ go get -u github.com/lanrat/certgraph
 
 ## [Web UI](https://lanrat.github.io/certgraph/)
 
-A web UI is provided in the docs folder and is accessable at the github pages url [https://lanrat.github.io/certgraph/](https://lanrat.github.io/certgraph/).
+A web UI is provided in the docs folder and is accessible at the github pages url [https://lanrat.github.io/certgraph/](https://lanrat.github.io/certgraph/).
 
 The web UI takes the output provided with the `-json` flag.
 The JSON graph can be sent to the web interface as an uploaded file, remote URL, or as the query string using the data variable.

@@ -5,6 +5,7 @@ import (
 	"os"
 )
 
+// Verbose set to true to enable the verbose printing function
 var Verbose = false
 
 func v(a ...interface{}) {

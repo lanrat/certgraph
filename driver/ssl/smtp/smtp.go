@@ -20,6 +20,7 @@ type smtpDriver struct {
 	timeout  time.Duration
 }
 
+// NewSSLDriver creates a new SSL driver for SMTP Connections
 func NewSSLDriver(timeout time.Duration, savePath string) (ssl.Driver, error) {
 	d := new(smtpDriver)
 	d.port = "25"
@@ -71,6 +72,7 @@ func (d *smtpDriver) GetCert(host string) (status.DomainStatus, *graph.CertNode,
 	return status.GOOD, certnode, nil
 }
 
+// GetMX returns the MX records for the provided domain
 func GetMX(domain string) ([]string, error) {
 	domains := make([]string, 0, 5)
 	mx, err := net.LookupMX(domain)

@@ -23,6 +23,7 @@ type httpDriver struct {
 	timeout  time.Duration
 }
 
+// NewSSLDriver creates a new SSL driver for HTTP Connections
 func NewSSLDriver(timeout time.Duration, savePath string) (ssl.Driver, error) {
 	d := new(httpDriver)
 	d.port = "443"

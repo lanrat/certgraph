@@ -6,38 +6,45 @@ import (
 	"github.com/lanrat/certgraph/status"
 )
 
-// main graph storage engine
+// CertGraph main graph storage engine
 type CertGraph struct {
 	domains    sync.Map
 	certs      sync.Map
 	numDomains int
 }
 
+// NewCertGraph instantiates a new empty CertGraph
 func NewCertGraph() *CertGraph {
 	graph := new(CertGraph)
 	return graph
 }
 
-func (graph *CertGraph) LoadOrStoreCert(nodein *CertNode) (*CertNode, bool) {
-	nodeout, ok := graph.certs.LoadOrStore(nodein.Fingerprint, nodein)
+// LoadOrStoreCert will return the CertNode in the graph with the provided node's fingerprint, or store the node if it did not already exist
+// returned bool is true if the CertNode was found, false if stored
+func (graph *CertGraph) LoadOrStoreCert(node *CertNode) (*CertNode, bool) {
+	nodeout, ok := graph.certs.LoadOrStore(node.Fingerprint, node)
 	return nodeout.(*CertNode), ok
 }
 
+// AddCert add a CertNode to the graph
 // TODO check for existing?
 func (graph *CertGraph) AddCert(certnode *CertNode) {
 	graph.certs.Store(certnode.Fingerprint, certnode)
 }
 
+// AddDomain add a DomainNode to the graph
 // TODO check for existing?
 func (graph *CertGraph) AddDomain(domainnode *DomainNode) {
 	graph.numDomains++
 	graph.domains.Store(domainnode.Domain, domainnode)
 }
 
+//Len returns the number of domains in the graph
 func (graph *CertGraph) Len() int {
 	return graph.numDomains
 }
 
+// GetCert returns (CertNode, found) for the certificate with the provided Fingerprint in the graph if found
 func (graph *CertGraph) GetCert(fp Fingerprint) (*CertNode, bool) {
 	node, ok := graph.certs.Load(fp)
 	if ok {
@@ -46,6 +53,7 @@ func (graph *CertGraph) GetCert(fp Fingerprint) (*CertNode, bool) {
 	return nil, false
 }
 
+// GetDomain returns (DomainNode, found) for the domain in the graph if found
 func (graph *CertGraph) GetDomain(domain string) (*DomainNode, bool) {
 	node, ok := graph.domains.Load(domain)
 	if ok {
@@ -54,6 +62,8 @@ func (graph *CertGraph) GetDomain(domain string) (*DomainNode, bool) {
 	return nil, false
 }
 
+// GetDomainNeighbors given a domain, return the list of all other domains that share a certificate with the provided domain that are in the graph
+// cdn will include CDN certs as well
 func (graph *CertGraph) GetDomainNeighbors(domain string, cdn bool) []string {
 	neighbors := make(map[string]bool)
 
@@ -98,15 +108,17 @@ func (graph *CertGraph) GetDomainNeighbors(domain string, cdn bool) []string {
 	neighbors[domain] = false
 
 	// convert map to array
-	neighbor_list := make([]string, 0, len(neighbors))
+	neighborList := make([]string, 0, len(neighbors))
 	for key := range neighbors {
 		if neighbors[key] {
-			neighbor_list = append(neighbor_list, key)
+			neighborList = append(neighborList, key)
 		}
 	}
-	return neighbor_list
+	return neighborList
 }
 
+// GenerateMap returns a map representation of the certificate graph
+// used for JSON serialization
 func (graph *CertGraph) GenerateMap() map[string]interface{} {
 	m := make(map[string]interface{})
 	nodes := make([]map[string]string, 0, 2*graph.numDomains)

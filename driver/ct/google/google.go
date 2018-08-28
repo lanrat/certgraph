@@ -29,13 +29,14 @@ const searchURL2 = "https://transparencyreport.google.com/transparencyreport/api
 const certURL = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certbyhash?hash=DEADBEEF"
 
 type googleCT struct {
-	max_pages  float64 // this is a float because that is the type automatically decoded from the JSON response
+	maxPages   float64 // this is a float because that is the type automatically decoded from the JSON response
 	jsonClient *http.Client
 }
 
-func NewCTDriver(max_query_pages int, savePath string) (ct.Driver, error) {
+// NewCTDriver creates a new CT driver for google
+func NewCTDriver(maxQueryPages int, savePath string) (ct.Driver, error) {
 	d := new(googleCT)
-	d.max_pages = float64(max_query_pages)
+	d.maxPages = float64(maxQueryPages)
 	d.jsonClient = &http.Client{Timeout: 10 * time.Second}
 
 	if len(savePath) > 0 {
@@ -46,8 +47,8 @@ func NewCTDriver(max_query_pages int, savePath string) (ct.Driver, error) {
 	return d, nil
 }
 
-// gets JSON from url and parses it into target object
-func (d *googleCT) getJsonP(url string, target interface{}) error {
+// getJsonP gets JSON from url and parses it into target object
+func (d *googleCT) getJSONP(url string, target interface{}) error {
 	r, err := d.jsonClient.Get(url)
 	if err != nil {
 		return err
@@ -67,7 +68,7 @@ func (d *googleCT) getJsonP(url string, target interface{}) error {
 	return json.Unmarshal(respData, target)
 }
 
-func (d *googleCT) QueryDomain(domain string, include_expired bool, include_subdomains bool) ([]graph.Fingerprint, error) {
+func (d *googleCT) QueryDomain(domain string, includeExpired bool, includeSubdomains bool) ([]graph.Fingerprint, error) {
 	results := make([]graph.Fingerprint, 0, 5)
 
 	u, err := url.Parse(searchURL1)
@@ -77,8 +78,8 @@ func (d *googleCT) QueryDomain(domain string, include_expired bool, include_subd
 
 	// get page 1
 	q := u.Query()
-	q.Set("include_expired", strconv.FormatBool(include_expired))
-	q.Set("include_subdomains", strconv.FormatBool(include_subdomains))
+	q.Set("include_expired", strconv.FormatBool(includeExpired))
+	q.Set("include_subdomains", strconv.FormatBool(includeSubdomains))
 	q.Set("domain", domain)
 	u.RawQuery = q.Encode()
 
@@ -89,8 +90,8 @@ func (d *googleCT) QueryDomain(domain string, include_expired bool, include_subd
 	// TODO allow for selective pagnation
 
 	// iterate over results
-	for len(nextURL) > 1 && currentPage <= d.max_pages {
-		err = d.getJsonP(nextURL, &raw)
+	for len(nextURL) > 1 && currentPage <= d.maxPages {
+		err = d.getJSONP(nextURL, &raw)
 		if err != nil {
 			return results, err
 		}
@@ -159,7 +160,7 @@ func (d *googleCT) QueryCert(fp graph.Fingerprint) (*graph.CertNode, error) {
 
 	var raw [][]interface{}
 
-	err = d.getJsonP(u.String(), &raw)
+	err = d.getJSONP(u.String(), &raw)
 	if err != nil {
 		return certnode, err
 	}
@@ -184,7 +185,7 @@ func (d *googleCT) QueryCert(fp graph.Fingerprint) (*graph.CertNode, error) {
 	return certnode, nil
 }
 
-// example function to use Google's CT API
+// CTexample example function to use Google's CT API
 func CTexample(domain string) error {
 	d, err := NewCTDriver(50, "")
 	if err != nil {

@@ -5,14 +5,15 @@ import (
 	"syscall"
 )
 
-// domain node conection status
+// DomainStatus domain node conection status
 type DomainStatus int
 
+// DomainStatus states
 const (
 	UNKNOWN = iota
 	GOOD    = iota
 	TIMEOUT = iota
-	NO_HOST = iota
+	NOHOST  = iota
 	REFUSED = iota
 	ERROR   = iota
 )
@@ -26,7 +27,7 @@ func (status DomainStatus) String() string {
 		return "Good"
 	case TIMEOUT:
 		return "Timeout"
-	case NO_HOST:
+	case NOHOST:
 		return "No Host"
 	case REFUSED:
 		return "Refused"
@@ -36,7 +37,7 @@ func (status DomainStatus) String() string {
 	return "?"
 }
 
-// Check for errors, print if network related
+// CheckNetErr check for errors, print if network related
 func CheckNetErr(err error) DomainStatus {
 	if err == nil {
 		return GOOD
@@ -46,7 +47,7 @@ func CheckNetErr(err error) DomainStatus {
 		switch t := err.(type) {
 		case *net.OpError:
 			if t.Op == "dial" {
-				return NO_HOST
+				return NOHOST
 			} else if t.Op == "read" {
 				return REFUSED
 			}
