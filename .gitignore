@@ -1,4 +1,4 @@
-Gopkg.lock
+go.sum
 certgraph
 build/
 *.json

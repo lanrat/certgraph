@@ -18,22 +18,23 @@ import (
 	"github.com/lanrat/certgraph/driver/ct"
 	"github.com/lanrat/certgraph/driver/ssl"
 	"github.com/lanrat/certgraph/graph"
-	_ "github.com/lib/pq"
+	_ "github.com/lib/pq" // portgresql
 )
 
 const connStr = "postgresql://guest@crt.sh/certwatch?sslmode=disable"
 
 type crtsh struct {
-	db          *sql.DB
-	query_limit int
-	timeout     time.Duration
-	save        bool
-	savePath    string
+	db         *sql.DB
+	queryLimit int
+	timeout    time.Duration
+	save       bool
+	savePath   string
 }
 
-func NewCTDriver(max_query_results int, timeout time.Duration, savePath string) (ct.Driver, error) {
+// NewCTDriver creates a new CT driver for crt.sh
+func NewCTDriver(maxQueryResults int, timeout time.Duration, savePath string) (ct.Driver, error) {
 	d := new(crtsh)
-	d.query_limit = max_query_results
+	d.queryLimit = maxQueryResults
 	var err error
 
 	if len(savePath) > 0 {
@@ -49,17 +50,17 @@ func NewCTDriver(max_query_results int, timeout time.Duration, savePath string) 
 }
 
 func (d *crtsh) setSQLTimeout(sec float64) error {
-	_, err := d.db.Exec(fmt.Sprintf("SET statement_timeout TO %d;", (1000 * sec)))
+	_, err := d.db.Exec(fmt.Sprintf("SET statement_timeout TO %f;", (1000 * sec)))
 	return err
 }
 
-func (d *crtsh) QueryDomain(domain string, include_expired bool, include_subdomains bool) ([]graph.Fingerprint, error) {
+func (d *crtsh) QueryDomain(domain string, includeExpired bool, includeSubdomains bool) ([]graph.Fingerprint, error) {
 	results := make([]graph.Fingerprint, 0, 5)
 
 	queryStr := ""
 
-	if include_subdomains {
-		if include_expired {
+	if includeSubdomains {
+		if includeExpired {
 			queryStr = `SELECT digest(certificate.certificate, 'sha256') sha256
 					FROM certificate_identity, certificate
 					WHERE certificate.id = certificate_identity.certificate_id
@@ -76,7 +77,7 @@ func (d *crtsh) QueryDomain(domain string, include_expired bool, include_subdoma
 					LIMIT $2`
 		}
 	} else {
-		if include_expired {
+		if includeExpired {
 			queryStr = `SELECT digest(certificate.certificate, 'sha256') sha256
 					FROM certificate_identity, certificate
 					WHERE certificate.id = certificate_identity.certificate_id
@@ -92,11 +93,11 @@ func (d *crtsh) QueryDomain(domain string, include_expired bool, include_subdoma
 		}
 	}
 
-	if include_subdomains {
+	if includeSubdomains {
 		domain = fmt.Sprintf("%%.%s", domain)
 	}
 
-	rows, err := d.db.Query(queryStr, domain, d.query_limit)
+	rows, err := d.db.Query(queryStr, domain, d.queryLimit)
 	if err != nil {
 		return results, err
 	}
@@ -137,22 +138,23 @@ func (d *crtsh) QueryCert(fp graph.Fingerprint) (*graph.CertNode, error) {
 	}
 
 	if d.save {
-		var raw_cert []byte
+		var rawCert []byte
 		queryStr = `SELECT certificate.certificate
 					FROM certificate
 					WHERE digest(certificate.certificate, 'sha256') = $1`
 		row := d.db.QueryRow(queryStr, fp[:])
-		err = row.Scan(&raw_cert)
+		err = row.Scan(&rawCert)
 		if err != nil {
 			return certnode, err
 		}
 
-		ssl.RawCertToPEMFile(raw_cert, path.Join(d.savePath, fp.HexString())+".pem")
+		ssl.RawCertToPEMFile(rawCert, path.Join(d.savePath, fp.HexString())+".pem")
 	}
 
 	return certnode, nil
 }
 
+// CTexample is a demo function used to test the crt.sh driver
 func CTexample(domain string) error {
 	d, err := NewCTDriver(1000, time.Duration(10)*time.Second, "")
 	if err != nil {

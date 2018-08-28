@@ -72,11 +72,9 @@ Precompiled releases will occasionally be uploaded to the [releases github page]
 
 ## Compiling
 
-To compile certgraph you must have a working go 1.9 or newer compiler on your system, as well as the golang [dep](https://github.com/golang/dep) dependency management tool.
+To compile certgraph you must have a working go 1.11 or newer compiler on your system, as certgraph makes use of go's modules for dependencies.
 To compile for the running system compilation is as easy as running make
 ```
-certgraph$ make dep
-dep ensure
 certgraph$ make
 go build -o certgraph certgraph.go
 ```
