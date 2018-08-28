@@ -70,6 +70,8 @@ The above output represents the adjacency list for the graph for the root domain
 
 Precompiled releases will occasionally be uploaded to the [releases github page](https://github.com/lanrat/certgraph/releases). https://github.com/lanrat/certgraph/releases
 
+Also available in [BlackArch](https://blackarch.org).
+
 ## Compiling
 
 To compile certgraph you must have a working go 1.11 or newer compiler on your system, as certgraph makes use of go's modules for dependencies.
