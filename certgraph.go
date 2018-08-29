@@ -23,6 +23,7 @@ var (
 	gitDate   = "none"
 	certGraph = graph.NewCertGraph()
 	gitHash   = "DEADBEEF"
+	startDomains = make([]string, 0, 1)
 )
 
 // driver types
@@ -69,8 +70,6 @@ func init() {
 }
 
 func main() {
-	var err error
-
 	if config.printVersion {
 		fmt.Println(version())
 		return
@@ -80,13 +79,12 @@ func main() {
 		flag.Usage()
 		return
 	}
+
 	if config.parallel < 1 {
 		fmt.Fprintln(os.Stderr, "Must enter a positive number of parallel threads")
 		flag.Usage()
 		return
 	}
-
-	startDomains := make([]string, 0, 1)
 
 	for _, domain := range flag.Args() {
 		d := strings.ToLower(domain)
@@ -95,7 +93,34 @@ func main() {
 		}
 	}
 
-	switch config.driver {
+	err := setDriver(config.driver)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
+
+	if len(config.savePath) > 0 {
+		err := os.MkdirAll(config.savePath, 0777)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
+	}
+
+	BFS(startDomains)
+
+	if config.printJSON {
+		printJSONGraph()
+	}
+
+	v("Found", certGraph.Len(), "domains")
+	v("Graph Depth:", depth)
+}
+
+// setDriver sets the driver variable for the provided driver string and does any necessary driver prep work
+func setDriver(driver string) error {
+	var err error
+	switch driver {
 	case "google":
 		config.ct = true
 		ctDriver, err = google.NewCTDriver(50, config.savePath)
@@ -113,30 +138,9 @@ func main() {
 			}
 		}
 	default:
-		fmt.Fprintln(os.Stderr, "Unknown driver name: "+config.driver)
-		return
+		return fmt.Errorf("Unknown driver name: %s", config.driver)
 	}
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
-	}
-
-	if len(config.savePath) > 0 {
-		err := os.MkdirAll(config.savePath, 0777)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-	}
-
-	BFS(startDomains)
-
-	if config.printJSON {
-		printJSONGraph()
-	}
-
-	v("Found", certGraph.Len(), "domains")
-	v("Graph Depth:", depth)
+	return err
 }
 
 // verbose logging
@@ -268,34 +272,34 @@ func visitCT(node *graph.DomainNode) {
 	for _, fp := range fingerprints {
 		// add certnode to graph
 
-		certnode, exists := certGraph.GetCert(fp)
+		certNode, exists := certGraph.GetCert(fp)
 
 		if !exists {
 			// get cert details
-			certnode, err = ctDriver.QueryCert(fp)
+			certNode, err = ctDriver.QueryCert(fp)
 			if err != nil {
 				v(err)
 				continue
 			}
 
-			certGraph.AddCert(certnode)
+			certGraph.AddCert(certNode)
 		}
 
-		node.AddCTFingerprint(certnode.Fingerprint)
+		node.AddCTFingerprint(certNode.Fingerprint)
 	}
 }
 
 // visit nodes by connecting to them
 func visitSSL(node *graph.DomainNode) {
-	dStatus, certnode, err := sslDriver.GetCert(node.Domain)
+	domainStatus, certNode, err := sslDriver.GetCert(node.Domain)
 	if err != nil {
 		v(err)
 	}
-	node.Status = dStatus
+	node.Status = domainStatus
 
-	if certnode != nil {
-		certnode, _ = certGraph.LoadOrStoreCert(certnode)
-		node.VisitedCert = certnode.Fingerprint
+	if certNode != nil {
+		certNode, _ = certGraph.LoadOrStoreCert(certNode)
+		node.VisitedCert = certNode.Fingerprint
 	}
 }
 

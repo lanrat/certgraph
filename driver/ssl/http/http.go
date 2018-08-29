@@ -37,7 +37,7 @@ func NewSSLDriver(timeout time.Duration, savePath string) (ssl.Driver, error) {
 	return d, nil
 }
 
-// gets the certificates found for a given domain
+// GetCert gets the certificates found for a given domain
 func (d *httpDriver) GetCert(host string) (status.DomainStatus, *graph.CertNode, error) {
 	addr := net.JoinHostPort(host, d.port)
 	dialer := &net.Dialer{Timeout: d.timeout}
@@ -47,7 +47,7 @@ func (d *httpDriver) GetCert(host string) (status.DomainStatus, *graph.CertNode,
 	domainStatus = status.CheckNetErr(err)
 	if domainStatus != status.GOOD {
 		//v(domainStatus, host)
-		return domainStatus, nil, err // TODO might want to make this return a nil error
+		return domainStatus, nil, err // might want to make this return a nil error
 	}
 	conn.Close()
 	connState := conn.ConnectionState()

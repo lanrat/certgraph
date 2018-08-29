@@ -24,7 +24,7 @@ import (
 	"github.com/lanrat/certgraph/graph"
 )
 
-// BASE URLs for Googl'e CT API
+// Base URLs for Google's CT API
 const searchURL1 = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certsearch?include_expired=false&include_subdomains=false&domain=example.com"
 const searchURL2 = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certsearch/page?p=DEADBEEF"
 const certURL = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certbyhash?hash=DEADBEEF"

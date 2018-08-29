@@ -34,7 +34,7 @@ func NewSSLDriver(timeout time.Duration, savePath string) (ssl.Driver, error) {
 	return d, nil
 }
 
-// gets the certificates found for a given domain
+// GetCert gets the certificates found for a given domain
 func (d *smtpDriver) GetCert(host string) (status.DomainStatus, *graph.CertNode, error) {
 	addr := net.JoinHostPort(host, d.port)
 	dialer := &net.Dialer{Timeout: d.timeout}
