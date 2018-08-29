@@ -44,7 +44,7 @@ func (d *DomainNode) String() string {
 	return fmt.Sprintf("%s\t%d\t%s\t%s", d.Domain, d.Depth, d.Status, cert)
 }
 
-// AddCTFingerprint appends a CT Fingerprint to the DomainNode
+// AddCTFingerprint appends a Fingerprint to the DomainNode
 func (d *DomainNode) AddCTFingerprint(fp fingerprint.Fingerprint) {
 	d.CTCerts = append(d.CTCerts, fp)
 }

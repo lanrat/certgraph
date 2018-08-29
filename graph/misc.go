@@ -1,19 +1,5 @@
 package graph
 
-import (
-	"fmt"
-	"os"
-)
-
-// Verbose set to true to enable the verbose printing function
-var Verbose = false
-
-func v(a ...interface{}) {
-	if Verbose {
-		fmt.Fprintln(os.Stderr, a...)
-	}
-}
-
 // given a domain returns the non-wildcard version of that domain
 func directDomain(domain string) string {
 	if len(domain) < 3 {

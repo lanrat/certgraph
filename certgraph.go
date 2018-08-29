@@ -18,11 +18,12 @@ import (
 	"github.com/lanrat/certgraph/graph"
 )
 
-// vars
-var dgraph = graph.NewCertGraph()
-var depth uint
-var gitDate = "none"
-var gitHash = "DEADBEEF"
+var (
+	depth     uint
+	gitDate   = "none"
+	certGraph = graph.NewCertGraph()
+	gitHash   = "DEADBEEF"
+)
 
 // driver types
 var ctDriver ct.Driver
@@ -30,51 +31,29 @@ var sslDriver ssl.Driver
 
 // config & flags
 var config struct {
-	timeout      time.Duration
-	verbose      bool
-	maxDepth     uint
-	parallel     uint
-	savePath     string
-	details      bool
-	printJSON    bool
-	ct           bool
-	driver       string
-	includeCTSub bool
-	includeCTExp bool
-	cdn          bool
+	timeout             time.Duration
+	verbose             bool
+	maxDepth            uint
+	parallel            uint
+	savePath            string
+	details             bool
+	printJSON           bool
+	ct                  bool
+	driver              string
+	includeCTSubdomains bool
+	includeCTExpired    bool
+	cdn                 bool
+	printVersion        bool
 }
 
-func generateGraphMetadata() map[string]interface{} {
-	data := make(map[string]interface{})
-	data["version"] = version()
-	data["website"] = "https://lanrat.github.io"
-	data["scan_date"] = time.Now().UTC()
-	data["command"] = strings.Join(os.Args, " ")
-	options := make(map[string]interface{})
-	options["parallel"] = config.parallel
-	options["depth"] = depth
-	options["driver"] = config.driver
-	options["ct_subdomains"] = config.includeCTSub
-	options["ct_expired"] = config.includeCTExp
-	options["cdn"] = config.cdn
-	options["timeout"] = config.timeout
-	data["options"] = options
-	return data
-}
-
-func version() string {
-	return fmt.Sprintf("Git commit: %s [%s]", gitDate, gitHash)
-}
-
-func main() {
-	var ver bool
-	var err error
-	flag.BoolVar(&ver, "version", false, "print version and exit")
-	timeoutPtr := flag.Uint("timeout", 10, "tcp timeout in seconds")
+func init() {
+	var timeoutSeconds uint
+	flag.BoolVar(&config.printVersion, "version", false, "print version and exit")
+	flag.UintVar(&timeoutSeconds, "timeout", 10, "tcp timeout in seconds")
 	flag.BoolVar(&config.verbose, "verbose", false, "verbose logging")
 	flag.StringVar(&config.driver, "driver", "http", "driver to use [http, smtp, google, crtsh]")
-	flag.BoolVar(&config.includeCTSub, "ct-subdomains", false, "include sub-domains in certificate transparency search")
-	flag.BoolVar(&config.includeCTExp, "ct-expired", false, "include expired certificates in certificate transparency search")
+	flag.BoolVar(&config.includeCTSubdomains, "ct-subdomains", false, "include sub-domains in certificate transparency search")
+	flag.BoolVar(&config.includeCTExpired, "ct-expired", false, "include expired certificates in certificate transparency search")
 	flag.BoolVar(&config.cdn, "cdn", false, "include certificates from CDNs")
 	flag.UintVar(&config.maxDepth, "depth", 5, "maximum BFS depth to go")
 	flag.UintVar(&config.parallel, "parallel", 10, "number of certificates to retrieve in parallel")
@@ -86,8 +65,13 @@ func main() {
 		flag.PrintDefaults()
 	}
 	flag.Parse()
+	config.timeout = time.Duration(timeoutSeconds) * time.Second
+}
 
-	if ver {
+func main() {
+	var err error
+
+	if config.printVersion {
 		fmt.Println(version())
 		return
 	}
@@ -102,10 +86,6 @@ func main() {
 		return
 	}
 
-	// set verbose logging
-	graph.Verbose = config.verbose
-
-	config.timeout = time.Duration(*timeoutPtr) * time.Second
 	startDomains := make([]string, 0, 1)
 
 	for _, domain := range flag.Args() {
@@ -155,7 +135,7 @@ func main() {
 		printJSONGraph()
 	}
 
-	v("Found", dgraph.Len(), "domains")
+	v("Found", certGraph.Len(), "domains")
 	v("Graph Depth:", depth)
 }
 
@@ -168,7 +148,7 @@ func v(a ...interface{}) {
 
 // prints the graph as a json object
 func printJSONGraph() {
-	jsonGraph := dgraph.GenerateMap()
+	jsonGraph := certGraph.GenerateMap()
 	jsonGraph["certgraph"] = generateGraphMetadata()
 
 	j, err := json.MarshalIndent(jsonGraph, "", "\t")
@@ -216,7 +196,7 @@ func BFS(roots []string) {
 
 			if !markedDomains[domainNode.Domain] {
 				markedDomains[domainNode.Domain] = true
-				dgraph.AddDomain(domainNode)
+				certGraph.AddDomain(domainNode)
 				go func(domainNode *graph.DomainNode) {
 					defer wg.Done()
 					// wait for pass
@@ -227,7 +207,7 @@ func BFS(roots []string) {
 					v("Visiting", domainNode.Depth, domainNode.Domain)
 					BFSVisit(domainNode) // visit
 					domainGraphChan <- domainNode
-					for _, neighbor := range dgraph.GetDomainNeighbors(domainNode.Domain, config.cdn) {
+					for _, neighbor := range certGraph.GetDomainNeighbors(domainNode.Domain, config.cdn) {
 						wg.Add(1)
 						domainChan <- graph.NewDomainNode(neighbor, domainNode.Depth+1)
 					}
@@ -278,7 +258,7 @@ func BFSVisit(node *graph.DomainNode) {
 func visitCT(node *graph.DomainNode) {
 	// perform ct search
 	// TODO do pagination in multiple threads to not block on long searches
-	fingerprints, err := ctDriver.QueryDomain(node.Domain, config.includeCTExp, config.includeCTSub)
+	fingerprints, err := ctDriver.QueryDomain(node.Domain, config.includeCTExpired, config.includeCTSubdomains)
 	if err != nil {
 		v(err)
 		return
@@ -288,7 +268,7 @@ func visitCT(node *graph.DomainNode) {
 	for _, fp := range fingerprints {
 		// add certnode to graph
 
-		certnode, exists := dgraph.GetCert(fp)
+		certnode, exists := certGraph.GetCert(fp)
 
 		if !exists {
 			// get cert details
@@ -298,7 +278,7 @@ func visitCT(node *graph.DomainNode) {
 				continue
 			}
 
-			dgraph.AddCert(certnode)
+			certGraph.AddCert(certnode)
 		}
 
 		node.AddCTFingerprint(certnode.Fingerprint)
@@ -314,7 +294,29 @@ func visitSSL(node *graph.DomainNode) {
 	node.Status = dStatus
 
 	if certnode != nil {
-		certnode, _ = dgraph.LoadOrStoreCert(certnode)
+		certnode, _ = certGraph.LoadOrStoreCert(certnode)
 		node.VisitedCert = certnode.Fingerprint
 	}
+}
+
+func generateGraphMetadata() map[string]interface{} {
+	data := make(map[string]interface{})
+	data["version"] = version()
+	data["website"] = "https://lanrat.github.io"
+	data["scan_date"] = time.Now().UTC()
+	data["command"] = strings.Join(os.Args, " ")
+	options := make(map[string]interface{})
+	options["parallel"] = config.parallel
+	options["depth"] = depth
+	options["driver"] = config.driver
+	options["ct_subdomains"] = config.includeCTSubdomains
+	options["ct_expired"] = config.includeCTExpired
+	options["cdn"] = config.cdn
+	options["timeout"] = config.timeout
+	data["options"] = options
+	return data
+}
+
+func version() string {
+	return fmt.Sprintf("Git commit: %s [%s]", gitDate, gitHash)
 }

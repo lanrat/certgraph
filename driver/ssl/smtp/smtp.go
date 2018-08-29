@@ -38,38 +38,38 @@ func NewSSLDriver(timeout time.Duration, savePath string) (ssl.Driver, error) {
 func (d *smtpDriver) GetCert(host string) (status.DomainStatus, *graph.CertNode, error) {
 	addr := net.JoinHostPort(host, d.port)
 	dialer := &net.Dialer{Timeout: d.timeout}
-	var dStatus status.DomainStatus = status.ERROR
+	var domainStatus status.DomainStatus = status.ERROR
 
 	conn, err := dialer.Dial("tcp", addr)
-	dStatus = status.CheckNetErr(err)
-	if dStatus != status.GOOD {
-		//v(dStatus, host)
-		return dStatus, nil, err
+	domainStatus = status.CheckNetErr(err)
+	if domainStatus != status.GOOD {
+		//v(domainStatus, host)
+		return domainStatus, nil, err
 	}
 	defer conn.Close()
 	smtp, err := smtp.NewClient(conn, host)
 	if err != nil {
 		//v(err)
-		return dStatus, nil, err // TODO might want to make these return a nil error
+		return domainStatus, nil, err // TODO might want to make these return a nil error
 	}
 	err = smtp.StartTLS(d.tlsConf)
 	if err != nil {
 		//v(err)
-		return dStatus, nil, err
+		return domainStatus, nil, err
 	}
 	connState, ok := smtp.TLSConnectionState()
 	if !ok {
-		return dStatus, nil, err
+		return domainStatus, nil, err
 	}
 
 	if d.save && len(connState.PeerCertificates) > 0 {
 		ssl.CertsToPEMFile(connState.PeerCertificates, path.Join(d.savePath, host)+".pem")
 	}
 
-	// TODO iterate over all certs, needs to also update dgraph.GetDomainNeighbors() too
-	certnode := graph.NewCertNode(connState.PeerCertificates[0])
-	certnode.HTTP = true
-	return status.GOOD, certnode, nil
+	// TODO iterate over all certs, needs to also update graph.GetDomainNeighbors() too
+	certNode := graph.NewCertNode(connState.PeerCertificates[0])
+	certNode.HTTP = true
+	return status.GOOD, certNode, nil
 }
 
 // GetMX returns the MX records for the provided domain

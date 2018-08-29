@@ -41,13 +41,13 @@ func NewSSLDriver(timeout time.Duration, savePath string) (ssl.Driver, error) {
 func (d *httpDriver) GetCert(host string) (status.DomainStatus, *graph.CertNode, error) {
 	addr := net.JoinHostPort(host, d.port)
 	dialer := &net.Dialer{Timeout: d.timeout}
-	var dStatus status.DomainStatus = status.ERROR
+	var domainStatus status.DomainStatus = status.ERROR
 
 	conn, err := tls.DialWithDialer(dialer, "tcp", addr, d.tlsConf)
-	dStatus = status.CheckNetErr(err)
-	if dStatus != status.GOOD {
-		//v(dStatus, host)
-		return dStatus, nil, err // TODO might want to make this return a nil error
+	domainStatus = status.CheckNetErr(err)
+	if domainStatus != status.GOOD {
+		//v(domainStatus, host)
+		return domainStatus, nil, err // TODO might want to make this return a nil error
 	}
 	conn.Close()
 	connState := conn.ConnectionState()
@@ -56,8 +56,8 @@ func (d *httpDriver) GetCert(host string) (status.DomainStatus, *graph.CertNode,
 		ssl.CertsToPEMFile(connState.PeerCertificates, path.Join(d.savePath, host)+".pem")
 	}
 
-	// TODO iterate over all certs, needs to also update dgraph.GetDomainNeighbors() too
-	certnode := graph.NewCertNode(connState.PeerCertificates[0])
-	certnode.HTTP = true
-	return status.GOOD, certnode, nil
+	// TODO iterate over all certs, needs to also update graph.GetDomainNeighbors() too
+	certNode := graph.NewCertNode(connState.PeerCertificates[0])
+	certNode.HTTP = true
+	return status.GOOD, certNode, nil
 }

@@ -23,8 +23,8 @@ func NewCertGraph() *CertGraph {
 // LoadOrStoreCert will return the CertNode in the graph with the provided node's fingerprint, or store the node if it did not already exist
 // returned bool is true if the CertNode was found, false if stored
 func (graph *CertGraph) LoadOrStoreCert(node *CertNode) (*CertNode, bool) {
-	nodeout, ok := graph.certs.LoadOrStore(node.Fingerprint, node)
-	return nodeout.(*CertNode), ok
+	foundNode, ok := graph.certs.LoadOrStore(node.Fingerprint, node)
+	return foundNode.(*CertNode), ok
 }
 
 // AddCert add a CertNode to the graph
@@ -74,15 +74,15 @@ func (graph *CertGraph) GetDomainNeighbors(domain string, cdn bool) []string {
 	//domain = directDomain(domain)
 	node, ok := graph.domains.Load(domain)
 	if ok {
-		domainnode := node.(*DomainNode)
+		domainNode := node.(*DomainNode)
 		// visited cert neighbors
-		node, ok := graph.certs.Load(domainnode.VisitedCert)
+		node, ok := graph.certs.Load(domainNode.VisitedCert)
 		if ok {
-			certnode := node.(*CertNode)
-			if !cdn && certnode.CDNCert() {
+			certNode := node.(*CertNode)
+			if !cdn && certNode.CDNCert() {
 				//v(domain, "-> CDN CERT")
 			} else {
-				for _, neighbor := range certnode.Domains {
+				for _, neighbor := range certNode.Domains {
 					neighbors[neighbor] = true
 					//v(domain, "- CERT ->", neighbor)
 				}
@@ -91,14 +91,14 @@ func (graph *CertGraph) GetDomainNeighbors(domain string, cdn bool) []string {
 		}
 
 		// CT neighbors
-		for _, fp := range domainnode.CTCerts {
+		for _, fp := range domainNode.CTCerts {
 			node, ok := graph.certs.Load(fp)
 			if ok {
-				certnode := node.(*CertNode)
-				if !cdn && certnode.CDNCert() {
+				certNode := node.(*CertNode)
+				if !cdn && certNode.CDNCert() {
 					//v(domain, "-> CDN CERT")
 				} else {
-					for _, neighbor := range certnode.Domains {
+					for _, neighbor := range certNode.Domains {
 						neighbors[neighbor] = true
 						//v(domain, "-- CT -->", neighbor)
 					}
@@ -130,23 +130,23 @@ func (graph *CertGraph) GenerateMap() map[string]interface{} {
 
 	// add all domain nodes
 	graph.domains.Range(func(key, value interface{}) bool {
-		domainnode := value.(*DomainNode)
-		nodes = append(nodes, domainnode.ToMap())
-		if domainnode.Status == status.GOOD {
-			links = append(links, map[string]string{"source": domainnode.Domain, "target": domainnode.VisitedCert.HexString(), "type": "uses"})
+		domainNode := value.(*DomainNode)
+		nodes = append(nodes, domainNode.ToMap())
+		if domainNode.Status == status.GOOD {
+			links = append(links, map[string]string{"source": domainNode.Domain, "target": domainNode.VisitedCert.HexString(), "type": "uses"})
 		}
 		return true
 	})
 
 	// add all cert nodes
 	graph.certs.Range(func(key, value interface{}) bool {
-		certnode := value.(*CertNode)
-		nodes = append(nodes, certnode.ToMap())
-		for _, domain := range certnode.Domains {
+		certNode := value.(*CertNode)
+		nodes = append(nodes, certNode.ToMap())
+		for _, domain := range certNode.Domains {
 			domain := directDomain(domain)
 			_, ok := graph.GetDomain(domain)
 			if ok {
-				links = append(links, map[string]string{"source": certnode.Fingerprint.HexString(), "target": domain, "type": "sans"})
+				links = append(links, map[string]string{"source": certNode.Fingerprint.HexString(), "target": domain, "type": "sans"})
 			} // TODO do something with alt-names that are not in graph like wildcards
 		}
 		return true

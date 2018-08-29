@@ -54,23 +54,23 @@ func (c *CertNode) ToMap() map[string]string {
 	m := make(map[string]string)
 	m["type"] = "certificate"
 	m["id"] = c.Fingerprint.HexString()
-	s := ""
+	str := ""
 	if c.HTTP {
-		s = "HTTP "
+		str = "HTTP "
 	}
 	if c.CT {
-		s = s + "CT"
+		str = str + "CT"
 	}
-	m["status"] = strings.TrimSuffix(s, " ")
+	m["status"] = strings.TrimSuffix(str, " ")
 	return m
 }
 
 // NewCertNode creates a CertNode from the provided certificate
 func NewCertNode(cert *x509.Certificate) *CertNode {
-	certnode := new(CertNode)
+	certNode := new(CertNode)
 
 	// generate Fingerprint
-	certnode.Fingerprint = fingerprint.FromBytes(cert.Raw)
+	certNode.Fingerprint = fingerprint.FromBytes(cert.Raw)
 
 	// domains
 	// used to ensure uniq entries in domains array
@@ -87,9 +87,9 @@ func NewCertNode(cert *x509.Certificate) *CertNode {
 		}
 	}
 	for domain := range domainMap {
-		certnode.Domains = append(certnode.Domains, domain)
+		certNode.Domains = append(certNode.Domains, domain)
 	}
-	sort.Strings(certnode.Domains)
+	sort.Strings(certNode.Domains)
 
-	return certnode
+	return certNode
 }

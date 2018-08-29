@@ -116,10 +116,10 @@ func (d *crtsh) QueryDomain(domain string, includeExpired bool, includeSubdomain
 }
 
 func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error) {
-	certnode := new(graph.CertNode)
-	certnode.Fingerprint = fp
-	certnode.Domains = make([]string, 0, 5)
-	certnode.CT = true
+	certNode := new(graph.CertNode)
+	certNode.Fingerprint = fp
+	certNode.Domains = make([]string, 0, 5)
+	certNode.CT = true
 
 	queryStr := `SELECT DISTINCT certificate_identity.name_value
 				FROM certificate, certificate_identity
@@ -129,13 +129,13 @@ func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error) {
 
 	rows, err := d.db.Query(queryStr, fp[:])
 	if err != nil {
-		return certnode, err
+		return certNode, err
 	}
 
 	for rows.Next() {
 		var domain string
 		rows.Scan(&domain)
-		certnode.Domains = append(certnode.Domains, domain)
+		certNode.Domains = append(certNode.Domains, domain)
 	}
 
 	if d.save {
@@ -146,13 +146,13 @@ func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error) {
 		row := d.db.QueryRow(queryStr, fp[:])
 		err = row.Scan(&rawCert)
 		if err != nil {
-			return certnode, err
+			return certNode, err
 		}
 
 		ssl.RawCertToPEMFile(rawCert, path.Join(d.savePath, fp.HexString())+".pem")
 	}
 
-	return certnode, nil
+	return certNode, nil
 }
 
 // CTexample is a demo function used to test the crt.sh driver

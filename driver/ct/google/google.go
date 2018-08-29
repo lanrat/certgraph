@@ -145,14 +145,14 @@ func (d *googleCT) QueryDomain(domain string, includeExpired bool, includeSubdom
 }
 
 func (d *googleCT) QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error) {
-	certnode := new(graph.CertNode)
-	certnode.Fingerprint = fp
-	certnode.Domains = make([]string, 0, 5)
-	certnode.CT = true
+	certNode := new(graph.CertNode)
+	certNode.Fingerprint = fp
+	certNode.Domains = make([]string, 0, 5)
+	certNode.CT = true
 
 	u, err := url.Parse(certURL)
 	if err != nil {
-		return certnode, err
+		return certNode, err
 	}
 
 	q := u.Query()
@@ -163,27 +163,27 @@ func (d *googleCT) QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error
 
 	err = d.getJSONP(u.String(), &raw)
 	if err != nil {
-		return certnode, err
+		return certNode, err
 	}
 
 	// simple corectness checks
 	if raw[0][0] != "https.ct.chr" {
-		return certnode, errors.New("Got Unexpected Cert output: " + raw[0][0].(string))
+		return certNode, errors.New("Got Unexpected Cert output: " + raw[0][0].(string))
 	}
 	if len(raw[0]) != 3 {
 		// result not correct length, likely no results
 		//fmt.Println(raw[0])
-		return certnode, errors.New("Cert Does not exist! output: " + raw[0][0].(string))
+		return certNode, errors.New("Cert Does not exist! output: " + raw[0][0].(string))
 	}
 
 	certInfo := raw[0][1].([]interface{})
 	domains := certInfo[7].([]interface{})
 
 	for _, domain := range domains {
-		certnode.Domains = append(certnode.Domains, domain.(string))
+		certNode.Domains = append(certNode.Domains, domain.(string))
 	}
 
-	return certnode, nil
+	return certNode, nil
 }
 
 // CTexample example function to use Google's CT API
