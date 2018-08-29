@@ -19,7 +19,7 @@ type httpDriver struct {
 	port     string
 	save     bool
 	savePath string
-	tlsconf  *tls.Config
+	tlsConf  *tls.Config
 	timeout  time.Duration
 }
 
@@ -31,19 +31,19 @@ func NewSSLDriver(timeout time.Duration, savePath string) (ssl.Driver, error) {
 		d.save = true
 		d.savePath = savePath
 	}
-	d.tlsconf = &tls.Config{InsecureSkipVerify: true}
+	d.tlsConf = &tls.Config{InsecureSkipVerify: true}
 	d.timeout = timeout
 
 	return d, nil
 }
 
-// gets the certificats found for a given domain
+// gets the certificates found for a given domain
 func (d *httpDriver) GetCert(host string) (status.DomainStatus, *graph.CertNode, error) {
 	addr := net.JoinHostPort(host, d.port)
 	dialer := &net.Dialer{Timeout: d.timeout}
 	var dStatus status.DomainStatus = status.ERROR
 
-	conn, err := tls.DialWithDialer(dialer, "tcp", addr, d.tlsconf)
+	conn, err := tls.DialWithDialer(dialer, "tcp", addr, d.tlsConf)
 	dStatus = status.CheckNetErr(err)
 	if dStatus != status.GOOD {
 		//v(dStatus, host)

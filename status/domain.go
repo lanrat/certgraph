@@ -5,7 +5,7 @@ import (
 	"syscall"
 )
 
-// DomainStatus domain node conection status
+// DomainStatus domain node connection status
 type DomainStatus int
 
 // DomainStatus states

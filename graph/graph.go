@@ -3,6 +3,7 @@ package graph
 import (
 	"sync"
 
+	"github.com/lanrat/certgraph/fingerprint"
 	"github.com/lanrat/certgraph/status"
 )
 
@@ -27,15 +28,18 @@ func (graph *CertGraph) LoadOrStoreCert(node *CertNode) (*CertNode, bool) {
 }
 
 // AddCert add a CertNode to the graph
-// TODO check for existing?
 func (graph *CertGraph) AddCert(certnode *CertNode) {
+	// save the cert to the graph
+	// if it already exists we overwrite, it is simpler than checking first.
 	graph.certs.Store(certnode.Fingerprint, certnode)
 }
 
 // AddDomain add a DomainNode to the graph
-// TODO check for existing?
 func (graph *CertGraph) AddDomain(domainnode *DomainNode) {
 	graph.numDomains++
+	// save the domain to the graph
+	// if it already exists we overwrite, it is simpler than checking first.
+	// graph.numDomains should still be accurate because we only call this after checking that we have not visited the node before.
 	graph.domains.Store(domainnode.Domain, domainnode)
 }
 
@@ -45,7 +49,7 @@ func (graph *CertGraph) Len() int {
 }
 
 // GetCert returns (CertNode, found) for the certificate with the provided Fingerprint in the graph if found
-func (graph *CertGraph) GetCert(fp Fingerprint) (*CertNode, bool) {
+func (graph *CertGraph) GetCert(fp fingerprint.Fingerprint) (*CertNode, bool) {
 	node, ok := graph.certs.Load(fp)
 	if ok {
 		return node.(*CertNode), true

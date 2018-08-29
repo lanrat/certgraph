@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/lanrat/certgraph/driver/ct"
+	"github.com/lanrat/certgraph/fingerprint"
 	"github.com/lanrat/certgraph/graph"
 )
 
@@ -68,8 +69,8 @@ func (d *googleCT) getJSONP(url string, target interface{}) error {
 	return json.Unmarshal(respData, target)
 }
 
-func (d *googleCT) QueryDomain(domain string, includeExpired bool, includeSubdomains bool) ([]graph.Fingerprint, error) {
-	results := make([]graph.Fingerprint, 0, 5)
+func (d *googleCT) QueryDomain(domain string, includeExpired bool, includeSubdomains bool) ([]fingerprint.Fingerprint, error) {
+	results := make([]fingerprint.Fingerprint, 0, 5)
 
 	u, err := url.Parse(searchURL1)
 	if err != nil {
@@ -118,7 +119,7 @@ func (d *googleCT) QueryDomain(domain string, includeExpired bool, includeSubdom
 		foundCerts := raw[0][1].([]interface{})
 		for _, foundCert := range foundCerts {
 			certHash := foundCert.([]interface{})[5].(string)
-			certFP := graph.FingerprintFromB64(certHash)
+			certFP := fingerprint.FromB64(certHash)
 			results = append(results, certFP)
 		}
 
@@ -143,7 +144,7 @@ func (d *googleCT) QueryDomain(domain string, includeExpired bool, includeSubdom
 	return results, nil
 }
 
-func (d *googleCT) QueryCert(fp graph.Fingerprint) (*graph.CertNode, error) {
+func (d *googleCT) QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error) {
 	certnode := new(graph.CertNode)
 	certnode.Fingerprint = fp
 	certnode.Domains = make([]string, 0, 5)

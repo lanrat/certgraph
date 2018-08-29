@@ -30,18 +30,18 @@ var sslDriver ssl.Driver
 
 // config & flags
 var config struct {
-	timeout        time.Duration
-	verbose        bool
-	maxDepth       uint
-	parallel       uint
-	savePath       string
-	details        bool
-	printJSON      bool
-	ct             bool
-	driver         string
+	timeout      time.Duration
+	verbose      bool
+	maxDepth     uint
+	parallel     uint
+	savePath     string
+	details      bool
+	printJSON    bool
+	ct           bool
+	driver       string
 	includeCTSub bool
 	includeCTExp bool
-	cdn            bool
+	cdn          bool
 }
 
 func generateGraphMetadata() map[string]interface{} {

@@ -17,6 +17,7 @@ import (
 
 	"github.com/lanrat/certgraph/driver/ct"
 	"github.com/lanrat/certgraph/driver/ssl"
+	"github.com/lanrat/certgraph/fingerprint"
 	"github.com/lanrat/certgraph/graph"
 	_ "github.com/lib/pq" // portgresql
 )
@@ -54,8 +55,8 @@ func (d *crtsh) setSQLTimeout(sec float64) error {
 	return err
 }
 
-func (d *crtsh) QueryDomain(domain string, includeExpired bool, includeSubdomains bool) ([]graph.Fingerprint, error) {
-	results := make([]graph.Fingerprint, 0, 5)
+func (d *crtsh) QueryDomain(domain string, includeExpired bool, includeSubdomains bool) ([]fingerprint.Fingerprint, error) {
+	results := make([]fingerprint.Fingerprint, 0, 5)
 
 	queryStr := ""
 
@@ -108,13 +109,13 @@ func (d *crtsh) QueryDomain(domain string, includeExpired bool, includeSubdomain
 		if err != nil {
 			return results, err
 		}
-		results = append(results, graph.FingerprintFromBytes(hash))
+		results = append(results, fingerprint.FromHashBytes(hash))
 	}
 
 	return results, nil
 }
 
-func (d *crtsh) QueryCert(fp graph.Fingerprint) (*graph.CertNode, error) {
+func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error) {
 	certnode := new(graph.CertNode)
 	certnode.Fingerprint = fp
 	certnode.Domains = make([]string, 0, 5)

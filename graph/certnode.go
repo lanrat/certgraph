@@ -1,79 +1,24 @@
 package graph
 
 import (
-	"crypto/sha256"
 	"crypto/x509"
 	"fmt"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
-	"github.com/lanrat/certgraph/status"
+	"github.com/lanrat/certgraph/fingerprint"
 )
 
-// DomainNode structure to store a domain and its edges
-type DomainNode struct {
-	Domain      string
-	Depth       uint
-	VisitedCert Fingerprint
-	CTCerts     []Fingerprint
-	Status      status.DomainStatus
-	Root        bool
-}
-
-// NewDomainNode constructor for DomainNode, converts domain to directDomain
-func NewDomainNode(domain string, depth uint) *DomainNode {
-	node := new(DomainNode)
-	node.Domain = directDomain(domain)
-	node.Depth = depth
-	node.CTCerts = make([]Fingerprint, 0, 0)
-	return node
-}
-
-// get the string representation of a node
-func (d *DomainNode) String() string {
-	cert := ""
-	// CT
-	if len(d.CTCerts) > 0 {
-		for i := range d.CTCerts {
-			cert = fmt.Sprintf("%s %s", cert, d.CTCerts[i].HexString())
-		}
-		return fmt.Sprintf("%s\t%d\t%s", d.Domain, d.Depth, cert)
-	}
-	// non-ct
-	if d.Status == status.GOOD {
-		cert = d.VisitedCert.HexString()
-	}
-	return fmt.Sprintf("%s\t%d\t%s\t%s", d.Domain, d.Depth, d.Status, cert)
-}
-
-// AddCTFingerprint appends a CT Fingerprint to the DomainNode
-func (d *DomainNode) AddCTFingerprint(fp Fingerprint) {
-	d.CTCerts = append(d.CTCerts, fp)
-}
-
-// ToMap returns a map of the DomainNode's fields (weak serialization)
-func (d *DomainNode) ToMap() map[string]string {
-	m := make(map[string]string)
-	m["type"] = "domain"
-	m["id"] = d.Domain
-	m["status"] = d.Status.String()
-	m["root"] = strconv.FormatBool(d.Root)
-	m["depth"] = strconv.FormatUint(uint64(d.Depth), 10)
-	return m
-}
-
-// CertNode graph not to store certificate information
+// CertNode graph node to store certificate information
 type CertNode struct {
-	Fingerprint Fingerprint
+	Fingerprint fingerprint.Fingerprint
 	Domains     []string
 	CT          bool
 	HTTP        bool
 }
 
 func (c *CertNode) String() string {
-	//TODO Currently unused..
 	ct := ""
 	if c.CT {
 		ct = "CT"
@@ -98,6 +43,8 @@ func (c *CertNode) CDNCert() bool {
 			return true
 		}
 		// TODO include other CDNs
+		// this detection is weak, might want to change to filter certs with > n alt-names
+		// n = 80 might be a good start
 	}
 	return false
 }
@@ -123,7 +70,7 @@ func NewCertNode(cert *x509.Certificate) *CertNode {
 	certnode := new(CertNode)
 
 	// generate Fingerprint
-	certnode.Fingerprint = sha256.Sum256(cert.Raw)
+	certnode.Fingerprint = fingerprint.FromBytes(cert.Raw)
 
 	// domains
 	// used to ensure uniq entries in domains array
