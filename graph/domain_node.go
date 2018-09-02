@@ -21,10 +21,10 @@ type DomainNode struct {
 	Root           bool
 }
 
-// NewDomainNode constructor for DomainNode, converts domain to directDomain
+// NewDomainNode constructor for DomainNode, converts domain to nonWildcard
 func NewDomainNode(domain string, depth uint) *DomainNode {
 	node := new(DomainNode)
-	node.Domain = directDomain(domain)
+	node.Domain = nonWildcard(domain)
 	node.Depth = depth
 	node.Certs = make([]fingerprint.Fingerprint, 0, 0)
 	node.RelatedDomains = make(status.Map)

@@ -69,9 +69,8 @@ func (graph *CertGraph) GetDomain(domain string) (*DomainNode, bool) {
 // cdn will include CDN certs as well
 func (graph *CertGraph) GetDomainNeighbors(domain string, cdn bool) []string {
 	neighbors := make(map[string]bool)
-	// TODO return
 
-	//domain = directDomain(domain)
+	domain = nonWildcard(domain)
 	node, ok := graph.domains.Load(domain)
 	if ok {
 		domainNode := node.(*DomainNode)
@@ -133,7 +132,7 @@ func (graph *CertGraph) GenerateMap() map[string]interface{} {
 		certNode := value.(*CertNode)
 		nodes = append(nodes, certNode.ToMap())
 		for _, domain := range certNode.Domains {
-			domain := directDomain(domain)
+			domain = nonWildcard(domain)
 			_, ok := graph.GetDomain(domain)
 			if ok {
 				links = append(links, map[string]string{"source": certNode.Fingerprint.HexString(), "target": domain, "type": "sans"})

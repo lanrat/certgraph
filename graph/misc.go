@@ -5,6 +5,6 @@ import (
 )
 
 // given a domain returns the non-wildcard version of that domain
-func directDomain(domain string) string {
+func nonWildcard(domain string) string {
 	return strings.TrimPrefix(domain, "*.")
 }
