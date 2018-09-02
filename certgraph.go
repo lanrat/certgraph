@@ -4,31 +4,29 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/lanrat/certgraph/driver/ct"
-	"github.com/lanrat/certgraph/driver/ct/crtsh"
-	"github.com/lanrat/certgraph/driver/ct/google"
-	"github.com/lanrat/certgraph/driver/ssl"
-	"github.com/lanrat/certgraph/driver/ssl/http"
-	"github.com/lanrat/certgraph/driver/ssl/smtp"
+	"github.com/lanrat/certgraph/driver"
+	"github.com/lanrat/certgraph/driver/crtsh"
+	"github.com/lanrat/certgraph/driver/google"
+	"github.com/lanrat/certgraph/driver/http"
+	"github.com/lanrat/certgraph/driver/smtp"
 	"github.com/lanrat/certgraph/graph"
 )
 
 var (
-	depth     uint
-	gitDate   = "none"
-	certGraph = graph.NewCertGraph()
-	gitHash   = "DEADBEEF"
+	depth        uint
+	gitDate      = "none"
+	certGraph    = graph.NewCertGraph()
+	gitHash      = "master"
 	startDomains = make([]string, 0, 1)
 )
 
-// driver types
-var ctDriver ct.Driver
-var sslDriver ssl.Driver
+var certDriver driver.Driver
 
 // config & flags
 var config struct {
@@ -39,7 +37,6 @@ var config struct {
 	savePath            string
 	details             bool
 	printJSON           bool
-	ct                  bool
 	driver              string
 	includeCTSubdomains bool
 	includeCTExpired    bool
@@ -52,7 +49,7 @@ func init() {
 	flag.BoolVar(&config.printVersion, "version", false, "print version and exit")
 	flag.UintVar(&timeoutSeconds, "timeout", 10, "tcp timeout in seconds")
 	flag.BoolVar(&config.verbose, "verbose", false, "verbose logging")
-	flag.StringVar(&config.driver, "driver", "http", "driver to use [http, smtp, google, crtsh]")
+	flag.StringVar(&config.driver, "driver", "http", fmt.Sprintf("driver to use [%s]", strings.Join(driver.Drivers, ", ")))
 	flag.BoolVar(&config.includeCTSubdomains, "ct-subdomains", false, "include sub-domains in certificate transparency search")
 	flag.BoolVar(&config.includeCTExpired, "ct-expired", false, "include expired certificates in certificate transparency search")
 	flag.BoolVar(&config.cdn, "cdn", false, "include certificates from CDNs")
@@ -70,35 +67,41 @@ func init() {
 }
 
 func main() {
+	// check for version flag
 	if config.printVersion {
 		fmt.Println(version())
 		return
 	}
 
+	// print usage if no domain passed
 	if flag.NArg() < 1 {
 		flag.Usage()
 		return
 	}
 
+	// cant run on 0 threads
 	if config.parallel < 1 {
 		fmt.Fprintln(os.Stderr, "Must enter a positive number of parallel threads")
 		flag.Usage()
 		return
 	}
 
+	// add domains passed to startDomains
 	for _, domain := range flag.Args() {
 		d := strings.ToLower(domain)
 		if len(d) > 0 {
-			startDomains = append(startDomains, d)
+			startDomains = append(startDomains, cleanInput(d))
 		}
 	}
 
+	// set driver
 	err := setDriver(config.driver)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
 
+	// create the output directory if it does not exist
 	if len(config.savePath) > 0 {
 		err := os.MkdirAll(config.savePath, 0777)
 		if err != nil {
@@ -107,8 +110,10 @@ func main() {
 		}
 	}
 
+	// perform breath-first-search on the graph
 	BFS(startDomains)
 
+	// print the json output
 	if config.printJSON {
 		printJSONGraph()
 	}
@@ -118,25 +123,18 @@ func main() {
 }
 
 // setDriver sets the driver variable for the provided driver string and does any necessary driver prep work
+// TODO make config generic and move this to driver module
 func setDriver(driver string) error {
 	var err error
 	switch driver {
 	case "google":
-		config.ct = true
-		ctDriver, err = google.NewCTDriver(50, config.savePath)
+		certDriver, err = google.Driver(50, config.savePath, config.includeCTSubdomains, config.includeCTExpired)
 	case "crtsh":
-		config.ct = true
-		ctDriver, err = crtsh.NewCTDriver(1000, config.timeout, config.savePath)
+		certDriver, err = crtsh.Driver(1000, config.timeout, config.savePath, config.includeCTSubdomains, config.includeCTExpired)
 	case "http":
-		sslDriver, err = http.NewSSLDriver(config.timeout, config.savePath)
+		certDriver, err = http.Driver(config.timeout, config.savePath)
 	case "smtp":
-		sslDriver, err = smtp.NewSSLDriver(config.timeout, config.savePath)
-		for _, domain := range startDomains {
-			mx, err := smtp.GetMX(domain)
-			if err == nil {
-				startDomains = append(startDomains, mx...)
-			}
-		}
+		certDriver, err = smtp.Driver(config.timeout, config.savePath)
 	default:
 		return fmt.Errorf("Unknown driver name: %s", config.driver)
 	}
@@ -176,13 +174,18 @@ func BFS(roots []string) {
 		threadPass <- true
 	}
 
-	// put root nodes/domains into queue
-	for _, root := range roots {
-		wg.Add(1)
-		n := graph.NewDomainNode(root, 0)
-		n.Root = true
-		domainChan <- n
-	}
+	// thread to put root nodes/domains into queue
+	wg.Add(1)
+	go func() {
+		// the waitGroup Add and Done for this thread ensures that we don't exit before any of the inputs domains are put into the Queue
+		defer wg.Done()
+		for _, root := range roots {
+			wg.Add(1)
+			n := graph.NewDomainNode(root, 0)
+			n.Root = true
+			domainChan <- n
+		}
+	}()
 	// thread to start all other threads from DomainChan
 	go func() {
 		for {
@@ -207,7 +210,7 @@ func BFS(roots []string) {
 					<-threadPass
 					defer func() { threadPass <- true }()
 
-					// do things
+					// operate on the node
 					v("Visiting", domainNode.Depth, domainNode.Domain)
 					BFSVisit(domainNode) // visit
 					domainGraphChan <- domainNode
@@ -251,62 +254,48 @@ func BFS(roots []string) {
 
 // BFSVisit visit each node and get and set its neighbors
 func BFSVisit(node *graph.DomainNode) {
-	if config.ct {
-		visitCT(node)
-	} else {
-		visitSSL(node)
-	}
-}
-
-// visit nodes by searching certificate transparency logs
-func visitCT(node *graph.DomainNode) {
-	// perform ct search
+	// perform cert search
 	// TODO do pagination in multiple threads to not block on long searches
-	fingerprints, err := ctDriver.QueryDomain(node.Domain, config.includeCTExpired, config.includeCTSubdomains)
+	results, err := certDriver.QueryDomain(node.Domain)
 	if err != nil {
-		v(err)
+		v("QueryDomain", node.Domain, err)
 		return
 	}
+	node.AddStatusMap(results.GetStatus())
 
+	// TODO parallelize this
+	// TODO fix printing domains as they are found with new driver
 	// add cert nodes to graph
+	fingerprints, err := results.GetFingerprints()
+	if err != nil {
+		v("GetFingerprints", err)
+		return
+	}
 	for _, fp := range fingerprints {
 		// add certnode to graph
-
 		certNode, exists := certGraph.GetCert(fp)
 
 		if !exists {
 			// get cert details
-			certNode, err = ctDriver.QueryCert(fp)
+			certNode, err = results.QueryCert(fp)
+			certNode.AddFound(certDriver.GetName())
 			if err != nil {
-				v(err)
+				v("QueryCert", err)
 				continue
 			}
 
 			certGraph.AddCert(certNode)
 		}
 
-		node.AddCTFingerprint(certNode.Fingerprint)
+		node.AddCertFingerprint(certNode.Fingerprint)
 	}
 }
 
-// visit nodes by connecting to them
-func visitSSL(node *graph.DomainNode) {
-	domainStatus, certNode, err := sslDriver.GetCert(node.Domain)
-	if err != nil {
-		v(err)
-	}
-	node.Status = domainStatus
-
-	if certNode != nil {
-		certNode, _ = certGraph.LoadOrStoreCert(certNode)
-		node.VisitedCert = certNode.Fingerprint
-	}
-}
-
+// generates metadata for the JSON output
 func generateGraphMetadata() map[string]interface{} {
 	data := make(map[string]interface{})
 	data["version"] = version()
-	data["website"] = "https://lanrat.github.io"
+	data["website"] = "https://lanrat.github.io/certgraph/"
 	data["scan_date"] = time.Now().UTC()
 	data["command"] = strings.Join(os.Args, " ")
 	options := make(map[string]interface{})
@@ -321,6 +310,23 @@ func generateGraphMetadata() map[string]interface{} {
 	return data
 }
 
+// returns the version string
 func version() string {
 	return fmt.Sprintf("Git commit: %s [%s]", gitDate, gitHash)
+}
+
+// cleanInput attempts to parse the input string as a url to extract the hostname
+// if it fails, then the input string is returned
+// also removes tailing '.'
+func cleanInput(host string) string {
+	host = strings.TrimSuffix(host, ".")
+	u, err := url.Parse(host)
+	if err != nil {
+		return host
+	}
+	hostname := u.Hostname()
+	if hostname == "" {
+		return host
+	}
+	return hostname
 }

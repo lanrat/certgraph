@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/lanrat/certgraph/fingerprint"
-	"github.com/lanrat/certgraph/status"
 )
 
 // CertGraph main graph storage engine
@@ -76,7 +75,7 @@ func (graph *CertGraph) GetDomainNeighbors(domain string, cdn bool) []string {
 	if ok {
 		domainNode := node.(*DomainNode)
 		// visited cert neighbors
-		node, ok := graph.certs.Load(domainNode.VisitedCert)
+		/*node, ok := graph.certs.Load(domainNode.VisitedCert)
 		if ok {
 			certNode := node.(*CertNode)
 			if !cdn && certNode.CDNCert() {
@@ -86,12 +85,11 @@ func (graph *CertGraph) GetDomainNeighbors(domain string, cdn bool) []string {
 					neighbors[neighbor] = true
 					//v(domain, "- CERT ->", neighbor)
 				}
-
 			}
-		}
+		}*/
 
-		// CT neighbors
-		for _, fp := range domainNode.CTCerts {
+		// Cert neighbors
+		for _, fp := range domainNode.Certs {
 			node, ok := graph.certs.Load(fp)
 			if ok {
 				certNode := node.(*CertNode)
@@ -103,7 +101,6 @@ func (graph *CertGraph) GetDomainNeighbors(domain string, cdn bool) []string {
 						//v(domain, "-- CT -->", neighbor)
 					}
 				}
-
 			}
 		}
 	}
@@ -132,9 +129,10 @@ func (graph *CertGraph) GenerateMap() map[string]interface{} {
 	graph.domains.Range(func(key, value interface{}) bool {
 		domainNode := value.(*DomainNode)
 		nodes = append(nodes, domainNode.ToMap())
-		if domainNode.Status == status.GOOD {
+		// TODO replace this with something once I create a replacement for DomainNode.VisitedCert.
+		/*if domainNode.Status == status.GOOD {
 			links = append(links, map[string]string{"source": domainNode.Domain, "target": domainNode.VisitedCert.HexString(), "type": "uses"})
-		}
+		}*/
 		return true
 	})
 
@@ -147,7 +145,7 @@ func (graph *CertGraph) GenerateMap() map[string]interface{} {
 			_, ok := graph.GetDomain(domain)
 			if ok {
 				links = append(links, map[string]string{"source": certNode.Fingerprint.HexString(), "target": domain, "type": "sans"})
-			} // TODO do something with alt-names that are not in graph like wildcards
+			}
 		}
 		return true
 	})

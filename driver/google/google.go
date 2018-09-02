@@ -12,17 +12,23 @@ package google
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strconv"
 	"time"
 
-	"github.com/lanrat/certgraph/driver/ct"
+	"github.com/lanrat/certgraph/driver"
 	"github.com/lanrat/certgraph/fingerprint"
 	"github.com/lanrat/certgraph/graph"
+	"github.com/lanrat/certgraph/status"
 )
+
+const driverName = "google"
+
+func init() {
+	driver.AddDriver(driverName)
+}
 
 // Base URLs for Google's CT API
 const searchURL1 = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certsearch?include_expired=false&include_subdomains=false&domain=example.com"
@@ -30,15 +36,37 @@ const searchURL2 = "https://transparencyreport.google.com/transparencyreport/api
 const certURL = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certbyhash?hash=DEADBEEF"
 
 type googleCT struct {
-	maxPages   float64 // this is a float because that is the type automatically decoded from the JSON response
-	jsonClient *http.Client
+	maxPages          float64 // this is a float because that is the type automatically decoded from the JSON response
+	jsonClient        *http.Client
+	includeExpired    bool
+	includeSubdomains bool
 }
 
-// NewCTDriver creates a new CT driver for google
-func NewCTDriver(maxQueryPages int, savePath string) (ct.Driver, error) {
+type googleCertDriver struct {
+	host         string
+	fingerprints []fingerprint.Fingerprint
+	driver       *googleCT
+}
+
+func (c *googleCertDriver) GetFingerprints() ([]fingerprint.Fingerprint, error) {
+	return c.fingerprints, nil
+}
+
+func (c *googleCertDriver) GetStatus() status.Map {
+	return status.NewMap(c.host, status.New(status.CT))
+}
+
+func (c *googleCertDriver) QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error) {
+	return c.driver.QueryCert(fp)
+}
+
+// Driver creates a new CT driver for google
+func Driver(maxQueryPages int, savePath string, includeSubdomains, includeExpired bool) (driver.Driver, error) {
 	d := new(googleCT)
 	d.maxPages = float64(maxQueryPages)
 	d.jsonClient = &http.Client{Timeout: 10 * time.Second}
+	d.includeExpired = includeExpired
+	d.includeSubdomains = includeSubdomains
 
 	if len(savePath) > 0 {
 		return d, errors.New("google driver does not support saving")
@@ -46,6 +74,10 @@ func NewCTDriver(maxQueryPages int, savePath string) (ct.Driver, error) {
 	}
 
 	return d, nil
+}
+
+func (d *googleCT) GetName() string {
+	return driverName
 }
 
 // getJsonP gets JSON from url and parses it into target object
@@ -56,7 +88,7 @@ func (d *googleCT) getJSONP(url string, target interface{}) error {
 	}
 	defer r.Body.Close()
 	if r.StatusCode != http.StatusOK {
-		return errors.New("Got non OK HTTP status:" + r.Status + "on URL: " + url)
+		return errors.New("Got non OK HTTP status: '" + r.Status + "' on URL: " + url)
 	}
 
 	respData, err := ioutil.ReadAll(r.Body)
@@ -69,8 +101,12 @@ func (d *googleCT) getJSONP(url string, target interface{}) error {
 	return json.Unmarshal(respData, target)
 }
 
-func (d *googleCT) QueryDomain(domain string, includeExpired bool, includeSubdomains bool) ([]fingerprint.Fingerprint, error) {
-	results := make([]fingerprint.Fingerprint, 0, 5)
+func (d *googleCT) QueryDomain(domain string) (driver.Result, error) {
+	results := &googleCertDriver{
+		fingerprints: make([]fingerprint.Fingerprint, 0, 5),
+		driver:       d,
+		host:         domain,
+	}
 
 	u, err := url.Parse(searchURL1)
 	if err != nil {
@@ -79,8 +115,8 @@ func (d *googleCT) QueryDomain(domain string, includeExpired bool, includeSubdom
 
 	// get page 1
 	q := u.Query()
-	q.Set("include_expired", strconv.FormatBool(includeExpired))
-	q.Set("include_subdomains", strconv.FormatBool(includeSubdomains))
+	q.Set("include_expired", strconv.FormatBool(d.includeExpired))
+	q.Set("include_subdomains", strconv.FormatBool(d.includeSubdomains))
 	q.Set("domain", domain)
 	u.RawQuery = q.Encode()
 
@@ -88,7 +124,7 @@ func (d *googleCT) QueryDomain(domain string, includeExpired bool, includeSubdom
 	nextURL := u.String()
 	currentPage := float64(1)
 
-	// TODO allow for selective pagnation
+	// TODO allow for selective pagination
 
 	// iterate over results
 	for len(nextURL) > 1 && currentPage <= d.maxPages {
@@ -112,7 +148,7 @@ func (d *googleCT) QueryDomain(domain string, includeExpired bool, includeSubdom
 			break
 		}
 
-		// pageInfo: [prevToken, nextToken, ? currPage, totalPages]
+		// pageInfo: [prevToken, nextToken, ? currentPage, totalPages]
 		pageInfo := raw[0][3].([]interface{})
 		currentPage = pageInfo[3].(float64)
 
@@ -120,7 +156,7 @@ func (d *googleCT) QueryDomain(domain string, includeExpired bool, includeSubdom
 		for _, foundCert := range foundCerts {
 			certHash := foundCert.([]interface{})[5].(string)
 			certFP := fingerprint.FromB64(certHash)
-			results = append(results, certFP)
+			results.fingerprints = append(results.fingerprints, certFP)
 		}
 
 		//fmt.Println("Page:", pageInfo[3])
@@ -148,7 +184,6 @@ func (d *googleCT) QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error
 	certNode := new(graph.CertNode)
 	certNode.Fingerprint = fp
 	certNode.Domains = make([]string, 0, 5)
-	certNode.CT = true
 
 	u, err := url.Parse(certURL)
 	if err != nil {
@@ -184,29 +219,4 @@ func (d *googleCT) QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error
 	}
 
 	return certNode, nil
-}
-
-// CTexample example function to use Google's CT API
-func CTexample(domain string) error {
-	d, err := NewCTDriver(50, "")
-	if err != nil {
-		return err
-	}
-	s, err := d.QueryDomain(domain, false, false)
-	if err != nil {
-		return err
-	}
-
-	for i := range s {
-		fmt.Println(s[i].HexString(), " ", s[i].B64Encode())
-		cert, err := d.QueryCert(s[i])
-		if err != nil {
-			return err
-		}
-		for j := range cert.Domains {
-			fmt.Println("\t", cert.Domains[j])
-		}
-	}
-
-	return nil
 }

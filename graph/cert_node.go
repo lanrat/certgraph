@@ -14,20 +14,17 @@ import (
 type CertNode struct {
 	Fingerprint fingerprint.Fingerprint
 	Domains     []string
-	CT          bool
-	HTTP        bool
+	Found       []string
 }
 
 func (c *CertNode) String() string {
-	ct := ""
-	if c.CT {
-		ct = "CT"
-	}
-	http := ""
-	if c.HTTP {
-		http = "HTTP"
-	}
-	return fmt.Sprintf("%s\t%s %s\t%v", c.Fingerprint.HexString(), http, ct, c.Domains)
+	return fmt.Sprintf("%s\t%s\t%v", c.Fingerprint.HexString(), c.Found, c.Domains)
+}
+
+// AddFound adds a driver name to the source of the certificate
+func (c *CertNode) AddFound(driver string) {
+	// TODO dedupe. this won't be an issue till multiple drivers operate on the same certnode
+	c.Found = append(c.Found, driver)
 }
 
 // CDNCert returns true if we think the certificate belongs to a CDN
@@ -54,14 +51,7 @@ func (c *CertNode) ToMap() map[string]string {
 	m := make(map[string]string)
 	m["type"] = "certificate"
 	m["id"] = c.Fingerprint.HexString()
-	str := ""
-	if c.HTTP {
-		str = "HTTP "
-	}
-	if c.CT {
-		str = str + "CT"
-	}
-	m["status"] = strings.TrimSuffix(str, " ")
+	m["found"] = strings.Join(c.Found, " ")
 	return m
 }
 

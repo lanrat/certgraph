@@ -37,9 +37,9 @@ func FromBytes(data []byte) Fingerprint {
 func FromB64(hash string) Fingerprint {
 	data, _ := base64.StdEncoding.DecodeString(hash)
 	/*if err != nil {
-		v(err)
+		fmt.Println(err)
 	}*/
-	return FromBytes(data)
+	return FromHashBytes(data)
 }
 
 // B64Encode returns the b64 string of a Fingerprint

@@ -1,4 +1,4 @@
-package ssl
+package driver
 
 import (
 	"crypto/x509"
@@ -8,6 +8,9 @@ import (
 
 // CertsToPEMFile saves certificates to local pem file
 func CertsToPEMFile(certs []*x509.Certificate, file string) error {
+	if fileExists(file) {
+		return nil
+	}
 	f, err := os.Create(file)
 	if err != nil {
 		return err
@@ -21,6 +24,9 @@ func CertsToPEMFile(certs []*x509.Certificate, file string) error {
 
 // RawCertToPEMFile saves raw certificate to local pem file
 func RawCertToPEMFile(cert []byte, file string) error {
+	if fileExists(file) {
+		return nil
+	}
 	f, err := os.Create(file)
 	if err != nil {
 		return err
@@ -28,4 +34,12 @@ func RawCertToPEMFile(cert []byte, file string) error {
 	defer f.Close()
 	pem.Encode(f, &pem.Block{Type: "CERTIFICATE", Bytes: cert})
 	return nil
+}
+
+func fileExists(f string) bool {
+	_, err := os.Stat(f)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return err == nil
 }
