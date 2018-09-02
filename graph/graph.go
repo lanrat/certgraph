@@ -69,24 +69,16 @@ func (graph *CertGraph) GetDomain(domain string) (*DomainNode, bool) {
 // cdn will include CDN certs as well
 func (graph *CertGraph) GetDomainNeighbors(domain string, cdn bool) []string {
 	neighbors := make(map[string]bool)
+	// TODO return
 
 	//domain = directDomain(domain)
 	node, ok := graph.domains.Load(domain)
 	if ok {
 		domainNode := node.(*DomainNode)
-		// visited cert neighbors
-		/*node, ok := graph.certs.Load(domainNode.VisitedCert)
-		if ok {
-			certNode := node.(*CertNode)
-			if !cdn && certNode.CDNCert() {
-				//v(domain, "-> CDN CERT")
-			} else {
-				for _, neighbor := range certNode.Domains {
-					neighbors[neighbor] = true
-					//v(domain, "- CERT ->", neighbor)
-				}
-			}
-		}*/
+		// related cert neighbors
+		for relatedDomain := range domainNode.RelatedDomains {
+			neighbors[relatedDomain] = true
+		}
 
 		// Cert neighbors
 		for _, fp := range domainNode.Certs {
