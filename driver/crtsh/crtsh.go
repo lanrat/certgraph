@@ -17,10 +17,8 @@ import (
 	"path"
 	"time"
 
-	// "github.com/lanrat/certgraph/driver/ct"
 	"github.com/lanrat/certgraph/driver"
 	"github.com/lanrat/certgraph/fingerprint"
-	"github.com/lanrat/certgraph/graph"
 	"github.com/lanrat/certgraph/status"
 	_ "github.com/lib/pq" // portgresql
 )
@@ -44,11 +42,11 @@ type crtsh struct {
 
 type crtshCertDriver struct {
 	host         string
-	fingerprints []fingerprint.Fingerprint
+	fingerprints driver.FingerprintMap
 	driver       *crtsh
 }
 
-func (c *crtshCertDriver) GetFingerprints() ([]fingerprint.Fingerprint, error) {
+func (c *crtshCertDriver) GetFingerprints() (driver.FingerprintMap, error) {
 	return c.fingerprints, nil
 }
 
@@ -56,7 +54,11 @@ func (c *crtshCertDriver) GetStatus() status.Map {
 	return status.NewMap(c.host, status.New(status.CT))
 }
 
-func (c *crtshCertDriver) QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error) {
+func (c *crtshCertDriver) GetRelated() ([]string, error) {
+	return make([]string, 0), nil
+}
+
+func (c *crtshCertDriver) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error) {
 	return c.driver.QueryCert(fp)
 }
 
@@ -92,7 +94,7 @@ func (d *crtsh) setSQLTimeout(sec float64) error {
 func (d *crtsh) QueryDomain(domain string) (driver.Result, error) {
 	results := &crtshCertDriver{
 		host:         domain,
-		fingerprints: make([]fingerprint.Fingerprint, 0, 5),
+		fingerprints: make(driver.FingerprintMap),
 		driver:       d,
 	}
 
@@ -147,9 +149,9 @@ func (d *crtsh) QueryDomain(domain string) (driver.Result, error) {
 			break
 		}
 	}
-	if try > 1 {
+	/*if try > 1 {
 		fmt.Println("QueryDomain try ", try)
-	}
+	}*/
 	if err != nil {
 		return results, err
 	}
@@ -160,14 +162,14 @@ func (d *crtsh) QueryDomain(domain string) (driver.Result, error) {
 		if err != nil {
 			return results, err
 		}
-		results.fingerprints = append(results.fingerprints, fingerprint.FromHashBytes(hash))
+		results.fingerprints.Add(domain, fingerprint.FromHashBytes(hash))
 	}
 
 	return results, nil
 }
 
-func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error) {
-	certNode := new(graph.CertNode)
+func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error) {
+	certNode := new(driver.CertResult)
 	certNode.Fingerprint = fp
 	certNode.Domains = make([]string, 0, 5)
 
@@ -188,9 +190,9 @@ func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error) {
 			break
 		}
 	}
-	if try > 1 {
+	/*if try > 1 {
 		fmt.Println("QueryCert try ", try)
-	}
+	}*/
 	if err != nil {
 		return certNode, err
 	}

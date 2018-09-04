@@ -20,7 +20,6 @@ import (
 
 	"github.com/lanrat/certgraph/driver"
 	"github.com/lanrat/certgraph/fingerprint"
-	"github.com/lanrat/certgraph/graph"
 	"github.com/lanrat/certgraph/status"
 )
 
@@ -44,11 +43,11 @@ type googleCT struct {
 
 type googleCertDriver struct {
 	host         string
-	fingerprints []fingerprint.Fingerprint
+	fingerprints driver.FingerprintMap
 	driver       *googleCT
 }
 
-func (c *googleCertDriver) GetFingerprints() ([]fingerprint.Fingerprint, error) {
+func (c *googleCertDriver) GetFingerprints() (driver.FingerprintMap, error) {
 	return c.fingerprints, nil
 }
 
@@ -56,7 +55,11 @@ func (c *googleCertDriver) GetStatus() status.Map {
 	return status.NewMap(c.host, status.New(status.CT))
 }
 
-func (c *googleCertDriver) QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error) {
+func (c *googleCertDriver) GetRelated() ([]string, error) {
+	return make([]string, 0), nil
+}
+
+func (c *googleCertDriver) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error) {
 	return c.driver.QueryCert(fp)
 }
 
@@ -103,7 +106,7 @@ func (d *googleCT) getJSONP(url string, target interface{}) error {
 
 func (d *googleCT) QueryDomain(domain string) (driver.Result, error) {
 	results := &googleCertDriver{
-		fingerprints: make([]fingerprint.Fingerprint, 0, 5),
+		fingerprints: make(driver.FingerprintMap),
 		driver:       d,
 		host:         domain,
 	}
@@ -156,9 +159,8 @@ func (d *googleCT) QueryDomain(domain string) (driver.Result, error) {
 		for _, foundCert := range foundCerts {
 			certHash := foundCert.([]interface{})[5].(string)
 			certFP := fingerprint.FromB64(certHash)
-			results.fingerprints = append(results.fingerprints, certFP)
+			results.fingerprints.Add(domain, certFP)
 		}
-
 		//fmt.Println("Page:", pageInfo[3])
 
 		// create url or next page
@@ -180,8 +182,8 @@ func (d *googleCT) QueryDomain(domain string) (driver.Result, error) {
 	return results, nil
 }
 
-func (d *googleCT) QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error) {
-	certNode := new(graph.CertNode)
+func (d *googleCT) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error) {
+	certNode := new(driver.CertResult)
 	certNode.Fingerprint = fp
 	certNode.Domains = make([]string, 0, 5)
 

@@ -31,6 +31,9 @@ func NewMeta(domainStatus DomainStatus, meta string) Status {
 }
 
 func (s *Status) String() string {
+	if s.Meta == "" {
+		return s.Status.String()
+	}
 	return fmt.Sprintf("%s(%s)", s.Status.String(), s.Meta)
 }
 
@@ -77,7 +80,7 @@ func (status DomainStatus) String() string {
 	case ERROR:
 		return "Error"
 	case REDIRECT:
-		return "REDIRECT"
+		return "Redirect"
 	case CT:
 		return "CT"
 	}

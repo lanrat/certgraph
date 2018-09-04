@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"strings"
 	"sync"
 
 	"github.com/lanrat/certgraph/fingerprint"
@@ -11,6 +12,7 @@ type CertGraph struct {
 	domains    sync.Map
 	certs      sync.Map
 	numDomains int
+	depth      uint
 }
 
 // NewCertGraph instantiates a new empty CertGraph
@@ -21,30 +23,39 @@ func NewCertGraph() *CertGraph {
 
 // LoadOrStoreCert will return the CertNode in the graph with the provided node's fingerprint, or store the node if it did not already exist
 // returned bool is true if the CertNode was found, false if stored
-func (graph *CertGraph) LoadOrStoreCert(node *CertNode) (*CertNode, bool) {
-	foundNode, ok := graph.certs.LoadOrStore(node.Fingerprint, node)
-	return foundNode.(*CertNode), ok
+func (graph *CertGraph) LoadOrStoreCert(certNode *CertNode) (*CertNode, bool) {
+	foundCertNode, ok := graph.certs.LoadOrStore(certNode.Fingerprint, certNode)
+	return foundCertNode.(*CertNode), ok
 }
 
 // AddCert add a CertNode to the graph
-func (graph *CertGraph) AddCert(certnode *CertNode) {
+func (graph *CertGraph) AddCert(certNode *CertNode) {
 	// save the cert to the graph
 	// if it already exists we overwrite, it is simpler than checking first.
-	graph.certs.Store(certnode.Fingerprint, certnode)
+	graph.certs.Store(certNode.Fingerprint, certNode)
 }
 
 // AddDomain add a DomainNode to the graph
-func (graph *CertGraph) AddDomain(domainnode *DomainNode) {
+func (graph *CertGraph) AddDomain(domainNode *DomainNode) {
 	graph.numDomains++
+	// save the new maximum depth if greather then current
+	if domainNode.Depth > graph.depth {
+		graph.depth = domainNode.Depth
+	}
 	// save the domain to the graph
 	// if it already exists we overwrite, it is simpler than checking first.
 	// graph.numDomains should still be accurate because we only call this after checking that we have not visited the node before.
-	graph.domains.Store(domainnode.Domain, domainnode)
+	graph.domains.Store(domainNode.Domain, domainNode)
 }
 
-//Len returns the number of domains in the graph
-func (graph *CertGraph) Len() int {
+//NumDomains returns the number of domains in the graph
+func (graph *CertGraph) NumDomains() int {
 	return graph.numDomains
+}
+
+//DomainDepth returns the maximum depth of the graph from the initial root domains
+func (graph *CertGraph) DomainDepth() uint {
+	return graph.depth
 }
 
 // GetCert returns (CertNode, found) for the certificate with the provided Fingerprint in the graph if found
@@ -67,7 +78,7 @@ func (graph *CertGraph) GetDomain(domain string) (*DomainNode, bool) {
 
 // GetDomainNeighbors given a domain, return the list of all other domains that share a certificate with the provided domain that are in the graph
 // cdn will include CDN certs as well
-func (graph *CertGraph) GetDomainNeighbors(domain string, cdn bool) []string {
+func (graph *CertGraph) GetDomainNeighbors(domain string, cdn bool, maxSANsSize int) []string {
 	neighbors := make(map[string]bool)
 
 	domain = nonWildcard(domain)
@@ -80,12 +91,14 @@ func (graph *CertGraph) GetDomainNeighbors(domain string, cdn bool) []string {
 		}
 
 		// Cert neighbors
-		for _, fp := range domainNode.Certs {
+		for _, fp := range domainNode.GetCertificates() {
 			node, ok := graph.certs.Load(fp)
 			if ok {
 				certNode := node.(*CertNode)
 				if !cdn && certNode.CDNCert() {
 					//v(domain, "-> CDN CERT")
+				} else if maxSANsSize > 0 && certNode.TLDPlus1Count() > maxSANsSize {
+					//v(domain, "-> Large CERT")
 				} else {
 					for _, neighbor := range certNode.Domains {
 						neighbors[neighbor] = true
@@ -120,10 +133,9 @@ func (graph *CertGraph) GenerateMap() map[string]interface{} {
 	graph.domains.Range(func(key, value interface{}) bool {
 		domainNode := value.(*DomainNode)
 		nodes = append(nodes, domainNode.ToMap())
-		// TODO replace this with something once I create a replacement for DomainNode.VisitedCert.
-		/*if domainNode.Status == status.GOOD {
-			links = append(links, map[string]string{"source": domainNode.Domain, "target": domainNode.VisitedCert.HexString(), "type": "uses"})
-		}*/
+		for fingerprint, found := range domainNode.Certs {
+			links = append(links, map[string]string{"source": domainNode.Domain, "target": fingerprint.HexString(), "type": strings.Join(found, " ")})
+		}
 		return true
 	})
 
@@ -143,5 +155,7 @@ func (graph *CertGraph) GenerateMap() map[string]interface{} {
 
 	m["nodes"] = nodes
 	m["links"] = links
+	m["depth"] = graph.depth
+	m["numDomains"] = graph.numDomains
 	return m
 }

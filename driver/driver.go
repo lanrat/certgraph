@@ -1,8 +1,11 @@
 package driver
 
 import (
+	"crypto/x509"
+	"sort"
+	"strings"
+
 	"github.com/lanrat/certgraph/fingerprint"
-	"github.com/lanrat/certgraph/graph"
 	"github.com/lanrat/certgraph/status"
 )
 
@@ -30,11 +33,59 @@ type Result interface {
 	// GetStatus returns the status of the initial domain queried with the Driver.QueryDomain call
 	GetStatus() status.Map
 
+	// returns a list of additional related domains discovered while looking up the provided domain
+	GetRelated() ([]string, error)
+
 	// GetFingerprints returns an array of the certificate fingerprints associated with the Domain
 	// pass return fingerprints to QueryCert to get certificate details
-	GetFingerprints() ([]fingerprint.Fingerprint, error)
+	GetFingerprints() (FingerprintMap, error)
 
 	// QueryCert returns the details of the provided certificate or an error if not found
-	QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error)
-	// TODO do I really want this ^^ to be a certnode?
+	QueryCert(fp fingerprint.Fingerprint) (*CertResult, error)
+}
+
+// FingerprintMap stores a mapping of domains to Fingerprints returned from the driver
+// in the case where multiple domains where queries (redirects, related, etc..) the
+// matching certificates will be in this map
+// the fingerprints returned are guaranted to be a complete result for the domain's certs, but related domains may or may not be complete
+type FingerprintMap map[string][]fingerprint.Fingerprint
+
+// Add adds a domain and fingerprint to the map
+func (f FingerprintMap) Add(domain string, fp fingerprint.Fingerprint) {
+	f[domain] = append(f[domain], fp)
+}
+
+// CertResult is an object to hold the fingerprint and Domains for a returned certificate
+type CertResult struct {
+	Fingerprint fingerprint.Fingerprint
+	Domains     []string
+}
+
+// NewCertResult creates a new CertResult struct from an x509 cert
+func NewCertResult(cert *x509.Certificate) *CertResult {
+	certResult := new(CertResult)
+
+	// generate Fingerprint
+	certResult.Fingerprint = fingerprint.FromBytes(cert.Raw)
+
+	// domains
+	// used to ensure uniq entries in domains array
+	domainMap := make(map[string]bool)
+	// add the CommonName just to be safe
+	cn := strings.ToLower(cert.Subject.CommonName)
+	if len(cn) > 0 {
+		domainMap[cn] = true
+	}
+	for _, domain := range cert.DNSNames {
+		if len(domain) > 0 {
+			domain = strings.ToLower(domain)
+			domainMap[domain] = true
+		}
+	}
+	for domain := range domainMap {
+		certResult.Domains = append(certResult.Domains, domain)
+	}
+	sort.Strings(certResult.Domains)
+
+	return certResult
 }

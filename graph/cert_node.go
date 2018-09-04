@@ -1,33 +1,44 @@
 package graph
 
 import (
-	"crypto/x509"
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/lanrat/certgraph/fingerprint"
+	"golang.org/x/net/publicsuffix"
 )
 
 // CertNode graph node to store certificate information
 type CertNode struct {
 	Fingerprint fingerprint.Fingerprint
 	Domains     []string
-	Found       []string
+	foundMap    map[string]bool
 }
 
 func (c *CertNode) String() string {
-	return fmt.Sprintf("%s\t%s\t%v", c.Fingerprint.HexString(), c.Found, c.Domains)
+	return fmt.Sprintf("%s\t%s\t%v", c.Fingerprint.HexString(), c.Found(), c.Domains)
+}
+
+// Found returns a list of drivers that found this cert
+func (c *CertNode) Found() []string {
+	found := make([]string, 0, len(c.foundMap))
+	for i := range c.foundMap {
+		found = append(found, i)
+	}
+	return found
 }
 
 // AddFound adds a driver name to the source of the certificate
 func (c *CertNode) AddFound(driver string) {
-	// TODO dedupe. this won't be an issue till multiple drivers operate on the same certnode
-	c.Found = append(c.Found, driver)
+	if c.foundMap == nil {
+		c.foundMap = make(map[string]bool)
+	}
+	c.foundMap[driver] = true
 }
 
 // CDNCert returns true if we think the certificate belongs to a CDN
+// very weak detection, only supports fastly & cloudflair
 func (c *CertNode) CDNCert() bool {
 	for _, domain := range c.Domains {
 		// cloudflair
@@ -35,15 +46,25 @@ func (c *CertNode) CDNCert() bool {
 		if matched {
 			return true
 		}
-
+		// fastly
 		if strings.HasSuffix(domain, "fastly.net") {
 			return true
 		}
-		// TODO include other CDNs
-		// this detection is weak, might want to change to filter certs with > n alt-names
-		// n = 80 might be a good start
 	}
 	return false
+}
+
+// TLDPlus1Count the number of tld+1 domains in the certificate
+func (c *CertNode) TLDPlus1Count() int {
+	tldPlus1Domains := make(map[string]bool)
+	for _, domain := range c.Domains {
+		tldPlus1, err := publicsuffix.EffectiveTLDPlusOne(domain)
+		if err != nil {
+			continue
+		}
+		tldPlus1Domains[tldPlus1] = true
+	}
+	return len(tldPlus1Domains)
 }
 
 // ToMap returns a map of the CertNode's fields (weak serialization)
@@ -51,35 +72,6 @@ func (c *CertNode) ToMap() map[string]string {
 	m := make(map[string]string)
 	m["type"] = "certificate"
 	m["id"] = c.Fingerprint.HexString()
-	m["found"] = strings.Join(c.Found, " ")
+	m["found"] = strings.Join(c.Found(), " ")
 	return m
-}
-
-// NewCertNode creates a CertNode from the provided certificate
-func NewCertNode(cert *x509.Certificate) *CertNode {
-	certNode := new(CertNode)
-
-	// generate Fingerprint
-	certNode.Fingerprint = fingerprint.FromBytes(cert.Raw)
-
-	// domains
-	// used to ensure uniq entries in domains array
-	domainMap := make(map[string]bool)
-	// add the CommonName just to be safe
-	cn := strings.ToLower(cert.Subject.CommonName)
-	if len(cn) > 0 {
-		domainMap[cn] = true
-	}
-	for _, domain := range cert.DNSNames {
-		if len(domain) > 0 {
-			domain = strings.ToLower(domain)
-			domainMap[domain] = true
-		}
-	}
-	for domain := range domainMap {
-		certNode.Domains = append(certNode.Domains, domain)
-	}
-	sort.Strings(certNode.Domains)
-
-	return certNode
 }

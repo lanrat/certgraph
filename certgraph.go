@@ -19,11 +19,9 @@ import (
 )
 
 var (
-	depth        uint
-	gitDate      = "none"
-	certGraph    = graph.NewCertGraph()
-	gitHash      = "master"
-	startDomains = make([]string, 0, 1)
+	gitDate   = "none"
+	gitHash   = "master"
+	certGraph = graph.NewCertGraph()
 )
 
 var certDriver driver.Driver
@@ -40,7 +38,8 @@ var config struct {
 	driver              string
 	includeCTSubdomains bool
 	includeCTExpired    bool
-	cdn                 bool
+	cdn bool
+	maxSANsSize                 int
 	printVersion        bool
 }
 
@@ -52,6 +51,7 @@ func init() {
 	flag.StringVar(&config.driver, "driver", "http", fmt.Sprintf("driver to use [%s]", strings.Join(driver.Drivers, ", ")))
 	flag.BoolVar(&config.includeCTSubdomains, "ct-subdomains", false, "include sub-domains in certificate transparency search")
 	flag.BoolVar(&config.includeCTExpired, "ct-expired", false, "include expired certificates in certificate transparency search")
+	flag.IntVar(&config.maxSANsSize, "sanscap", 80, "maximum number of uniq TLD+1 domains in certificate to include, 0 has no limit")
 	flag.BoolVar(&config.cdn, "cdn", false, "include certificates from CDNs")
 	flag.UintVar(&config.maxDepth, "depth", 5, "maximum BFS depth to go")
 	flag.UintVar(&config.parallel, "parallel", 10, "number of certificates to retrieve in parallel")
@@ -87,6 +87,7 @@ func main() {
 	}
 
 	// add domains passed to startDomains
+	startDomains := make([]string, 0, 1)
 	for _, domain := range flag.Args() {
 		d := strings.ToLower(domain)
 		if len(d) > 0 {
@@ -111,15 +112,15 @@ func main() {
 	}
 
 	// perform breath-first-search on the graph
-	BFS(startDomains)
+	breathFirstSearch(startDomains)
 
 	// print the json output
 	if config.printJSON {
 		printJSONGraph()
 	}
 
-	v("Found", certGraph.Len(), "domains")
-	v("Graph Depth:", depth)
+	v("Found", certGraph.NumDomains(), "domains")
+	v("Graph Depth:", certGraph.DomainDepth())
 }
 
 // setDriver sets the driver variable for the provided driver string and does any necessary driver prep work
@@ -144,8 +145,12 @@ func setDriver(driver string) error {
 // verbose logging
 func v(a ...interface{}) {
 	if config.verbose {
-		fmt.Fprintln(os.Stderr, a...)
+		e(a...)
 	}
+}
+
+func e(a ...interface{}) {
+	fmt.Fprintln(os.Stderr, a...)
 }
 
 // prints the graph as a json object
@@ -161,12 +166,11 @@ func printJSONGraph() {
 	fmt.Println(string(j))
 }
 
-// BFS perform Breadth first search to build the graph
-func BFS(roots []string) {
+// breathFirstSearch perform Breadth first search to build the graph
+func breathFirstSearch(roots []string) {
 	var wg sync.WaitGroup
-	markedDomains := make(map[string]bool)
-	domainChan := make(chan *graph.DomainNode, 5)      // input queue
-	domainGraphChan := make(chan *graph.DomainNode, 5) // output queue
+	domainNodeInputChan := make(chan *graph.DomainNode, 5)  // input queue
+	domainNodeOutputChan := make(chan *graph.DomainNode, 5) // output queue
 
 	// thread limit code
 	threadPass := make(chan bool, config.parallel)
@@ -183,13 +187,13 @@ func BFS(roots []string) {
 			wg.Add(1)
 			n := graph.NewDomainNode(root, 0)
 			n.Root = true
-			domainChan <- n
+			domainNodeInputChan <- n
 		}
 	}()
 	// thread to start all other threads from DomainChan
 	go func() {
 		for {
-			domainNode := <-domainChan
+			domainNode := <-domainNodeInputChan
 
 			// depth check
 			if domainNode.Depth > config.maxDepth {
@@ -197,12 +201,10 @@ func BFS(roots []string) {
 				wg.Done()
 				continue
 			}
-			if domainNode.Depth > depth {
-				depth = domainNode.Depth
-			}
+			// use certGraph.domains map as list of
+			// domains that are queued to be visited, or already have been
 
-			if !markedDomains[domainNode.Domain] {
-				markedDomains[domainNode.Domain] = true
+			if _, found := certGraph.GetDomain(domainNode.Domain); !found {
 				certGraph.AddDomain(domainNode)
 				go func(domainNode *graph.DomainNode) {
 					defer wg.Done()
@@ -212,11 +214,11 @@ func BFS(roots []string) {
 
 					// operate on the node
 					v("Visiting", domainNode.Depth, domainNode.Domain)
-					BFSVisit(domainNode) // visit
-					domainGraphChan <- domainNode
-					for _, neighbor := range certGraph.GetDomainNeighbors(domainNode.Domain, config.cdn) {
+					visit(domainNode)
+					domainNodeOutputChan <- domainNode
+					for _, neighbor := range certGraph.GetDomainNeighbors(domainNode.Domain, config.cdn, config.maxSANsSize) {
 						wg.Add(1)
-						domainChan <- graph.NewDomainNode(neighbor, domainNode.Depth+1)
+						domainNodeInputChan <- graph.NewDomainNode(neighbor, domainNode.Depth+1)
 					}
 				}(domainNode)
 			} else {
@@ -229,7 +231,7 @@ func BFS(roots []string) {
 	done := make(chan bool)
 	go func() {
 		for {
-			domainNode, more := <-domainGraphChan
+			domainNode, more := <-domainNodeOutputChan
 			if more {
 				if !config.printJSON {
 					if config.details {
@@ -248,50 +250,75 @@ func BFS(roots []string) {
 	}()
 
 	wg.Wait() // wait for querying to finish
-	close(domainGraphChan)
+	close(domainNodeOutputChan)
 	<-done // wait for save to finish
 }
 
-// BFSVisit visit each node and get and set its neighbors
-func BFSVisit(node *graph.DomainNode) {
+// visit visit each node and get and set its neighbors
+func visit(domainNode *graph.DomainNode) {
 	// perform cert search
 	// TODO do pagination in multiple threads to not block on long searches
-	results, err := certDriver.QueryDomain(node.Domain)
+	results, err := certDriver.QueryDomain(domainNode.Domain)
 	if err != nil {
-		v("QueryDomain", node.Domain, err)
+		// this is VERY common to error, usually this is a DNS or tcp connection related issue
+		// we will skip the domain if we can't query it
+		v("QueryDomain", domainNode.Domain, err)
 		return
 	}
-	node.AddStatusMap(results.GetStatus())
+	statuses := results.GetStatus()
+	domainNode.AddStatusMap(statuses)
+	relatedDomains, err := results.GetRelated()
+	if err != nil {
+		v("GetRelated", domainNode.Domain, err)
+		return
+	}
+	domainNode.AddRelatedDomains(relatedDomains)
 
 	// TODO parallelize this
 	// TODO fix printing domains as they are found with new driver
 	// add cert nodes to graph
-	fingerprints, err := results.GetFingerprints()
+	fingerprintMap, err := results.GetFingerprints()
 	if err != nil {
 		v("GetFingerprints", err)
 		return
 	}
+
+	// fingerprints for the domain queried
+	fingerprints := fingerprintMap[domainNode.Domain]
 	for _, fp := range fingerprints {
 		// add certnode to graph
 		certNode, exists := certGraph.GetCert(fp)
-
 		if !exists {
 			// get cert details
-			certNode, err = results.QueryCert(fp)
-			certNode.AddFound(certDriver.GetName())
+			certResult, err := results.QueryCert(fp)
 			if err != nil {
 				v("QueryCert", err)
 				continue
 			}
 
+			certNode = certNodeFromCertResult(certResult)
 			certGraph.AddCert(certNode)
 		}
 
-		node.AddCertFingerprint(certNode.Fingerprint)
+		certNode.AddFound(certDriver.GetName())
+		domainNode.AddCertFingerprint(certNode.Fingerprint, certDriver.GetName())
 	}
+
+	// we dont process any other certificates returned, they will be collected
+	//  when we process the related domains
+}
+
+// certNodeFromCertResult convert certResult to certNode
+func certNodeFromCertResult(certResult *driver.CertResult) *graph.CertNode {
+	certNode := &graph.CertNode{
+		Fingerprint: certResult.Fingerprint,
+		Domains:     certResult.Domains,
+	}
+	return certNode
 }
 
 // generates metadata for the JSON output
+// TODO map all config json
 func generateGraphMetadata() map[string]interface{} {
 	data := make(map[string]interface{})
 	data["version"] = version()
@@ -300,10 +327,10 @@ func generateGraphMetadata() map[string]interface{} {
 	data["command"] = strings.Join(os.Args, " ")
 	options := make(map[string]interface{})
 	options["parallel"] = config.parallel
-	options["depth"] = depth
 	options["driver"] = config.driver
 	options["ct_subdomains"] = config.includeCTSubdomains
 	options["ct_expired"] = config.includeCTExpired
+	options["sanscap"] = config.maxSANsSize
 	options["cdn"] = config.cdn
 	options["timeout"] = config.timeout
 	data["options"] = options

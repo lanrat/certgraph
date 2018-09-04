@@ -10,7 +10,6 @@ import (
 
 	"github.com/lanrat/certgraph/driver"
 	"github.com/lanrat/certgraph/fingerprint"
-	"github.com/lanrat/certgraph/graph"
 	"github.com/lanrat/certgraph/status"
 )
 
@@ -31,12 +30,13 @@ type httpDriver struct {
 type httpCertDriver struct {
 	parent       *httpDriver
 	client       *http.Client
-	fingerprints []fingerprint.Fingerprint
+	fingerprints driver.FingerprintMap
 	status       status.Map
-	certs        map[fingerprint.Fingerprint]*graph.CertNode
+	related      []string
+	certs        map[fingerprint.Fingerprint]*driver.CertResult
 }
 
-func (c *httpCertDriver) GetFingerprints() ([]fingerprint.Fingerprint, error) {
+func (c *httpCertDriver) GetFingerprints() (driver.FingerprintMap, error) {
 	return c.fingerprints, nil
 }
 
@@ -44,7 +44,11 @@ func (c *httpCertDriver) GetStatus() status.Map {
 	return c.status
 }
 
-func (c *httpCertDriver) QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error) {
+func (c *httpCertDriver) GetRelated() ([]string, error) {
+	return c.related, nil
+}
+
+func (c *httpCertDriver) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error) {
 	cert, found := c.certs[fp]
 	if found {
 		return cert, nil
@@ -75,9 +79,9 @@ func (d *httpDriver) GetName() string {
 func (d *httpDriver) newHTTPCertDriver() *httpCertDriver {
 	result := &httpCertDriver{
 		parent:       d,
-		fingerprints: make([]fingerprint.Fingerprint, 0, 1),
 		status:       make(status.Map),
-		certs:        make(map[fingerprint.Fingerprint]*graph.CertNode),
+		fingerprints: make(driver.FingerprintMap),
+		certs:        make(map[fingerprint.Fingerprint]*driver.CertResult),
 	}
 	// set client & client.Transport separately so that dialTLS checkRedirect can be referenced
 	result.client = &http.Client{
@@ -101,7 +105,7 @@ func (d *httpDriver) QueryDomain(host string) (driver.Result, error) {
 	resp, err := results.client.Get(fmt.Sprintf("https://%s", host))
 	fullStatus := status.CheckNetErr(err)
 	if fullStatus != status.GOOD {
-		return results, err // in some cases this error can be ignored
+		return results, err // in some rare cases this error can be ignored
 	}
 	defer resp.Body.Close()
 
@@ -119,6 +123,7 @@ func (c *httpCertDriver) checkRedirect(req *http.Request, via []*http.Request) e
 	// set both domain's status's
 	c.status.Set(via[0].URL.Hostname(), status.NewMeta(status.REDIRECT, req.URL.Hostname()))
 	c.status.Set(req.URL.Hostname(), status.New(status.UNKNOWN))
+	c.related = append(c.related, req.URL.Hostname())
 	if len(via) >= 10 { // stop after 10 redirects
 		// this stops the redirect
 		return http.ErrUseLastResponse
@@ -136,13 +141,17 @@ func (c *httpCertDriver) dialTLS(network, addr string) (net.Conn, error) {
 	connState := conn.ConnectionState()
 
 	// only look at leaf certificate which is valid for domain, rest of cert chain is ignored
-	certNode := graph.NewCertNode(connState.PeerCertificates[0])
-	c.certs[certNode.Fingerprint] = certNode
-	c.fingerprints = append(c.fingerprints, certNode.Fingerprint)
+	certResult := driver.NewCertResult(connState.PeerCertificates[0])
+	c.certs[certResult.Fingerprint] = certResult
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return conn, err
+	}
+	c.fingerprints.Add(host, certResult.Fingerprint)
 
 	// save
 	if c.parent.save && len(connState.PeerCertificates) > 0 {
-		driver.CertsToPEMFile(connState.PeerCertificates, path.Join(c.parent.savePath, certNode.Fingerprint.HexString())+".pem")
+		driver.CertsToPEMFile(connState.PeerCertificates, path.Join(c.parent.savePath, certResult.Fingerprint.HexString())+".pem")
 	}
 
 	return conn, err

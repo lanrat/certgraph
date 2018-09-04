@@ -1,6 +1,7 @@
 package smtp
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/lanrat/certgraph/driver"
 	"github.com/lanrat/certgraph/fingerprint"
-	"github.com/lanrat/certgraph/graph"
 	"github.com/lanrat/certgraph/status"
 )
 
@@ -32,21 +32,25 @@ type smtpDriver struct {
 
 type smtpCertDriver struct {
 	host         string
-	fingerprints []fingerprint.Fingerprint
+	fingerprints driver.FingerprintMap
 	status       status.Map
-	certs        map[fingerprint.Fingerprint]*graph.CertNode
+	mx           []string
+	certs        map[fingerprint.Fingerprint]*driver.CertResult
 }
 
-func (c *smtpCertDriver) GetFingerprints() ([]fingerprint.Fingerprint, error) {
+func (c *smtpCertDriver) GetFingerprints() (driver.FingerprintMap, error) {
 	return c.fingerprints, nil
 }
 
 func (c *smtpCertDriver) GetStatus() status.Map {
-	//return status.NewMap(c.host, status.New(c.status))
 	return c.status
 }
 
-func (c *smtpCertDriver) QueryCert(fp fingerprint.Fingerprint) (*graph.CertNode, error) {
+func (c *smtpCertDriver) GetRelated() ([]string, error) {
+	return c.mx, nil
+}
+
+func (c *smtpCertDriver) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error) {
 	cert, found := c.certs[fp]
 	if found {
 		return cert, nil
@@ -101,48 +105,47 @@ func (d *smtpDriver) smtpGetCerts(host string) ([]*x509.Certificate, error) {
 
 // QueryDomain gets the certificates found for a given domain
 func (d *smtpDriver) QueryDomain(host string) (driver.Result, error) {
-	hosts := make([]string, 0, 1)
-	hosts = append(hosts, host)
 	results := &smtpCertDriver{
 		host:         host,
-		fingerprints: make([]fingerprint.Fingerprint, 0, 1),
 		status:       make(status.Map),
-		certs:        make(map[fingerprint.Fingerprint]*graph.CertNode),
+		fingerprints: make(driver.FingerprintMap),
+		certs:        make(map[fingerprint.Fingerprint]*driver.CertResult),
 	}
 
-	mxHosts, err := GetMX(host)
-	if err != nil {
-		return results, err
+	// get related in different query
+	results.mx, _ = d.getMX(host)
+
+	certs, err := d.smtpGetCerts(host)
+	smtpStatus := status.CheckNetErr(err)
+	metaStatus := ""
+	if len(results.mx) > 0 {
+		metaStatus = fmt.Sprintf("MX(%s)", strings.Join(results.mx, " "))
 	}
-	hosts = append(hosts, mxHosts...)
+	results.status.Set(host, status.NewMeta(smtpStatus, metaStatus))
 
-	for _, host := range hosts {
-		certs, err := d.smtpGetCerts(host)
-		mxStatus := status.CheckNetErr(err)
-		if mxStatus != status.GOOD {
-			continue
-		}
+	if smtpStatus != status.GOOD {
+		return results, nil
+	}
 
-		// only look at leaf certificate which is valid for domain, rest of cert chain is ignored
-		certNode := graph.NewCertNode(certs[0])
-		results.status.Set(host, status.NewMeta(status.GOOD, "MX"))
-		results.certs[certNode.Fingerprint] = certNode
-		results.fingerprints = append(results.fingerprints, certNode.Fingerprint)
+	// only look at leaf certificate which is valid for domain, rest of cert chain is ignored
+	certResult := driver.NewCertResult(certs[0])
+	results.certs[certResult.Fingerprint] = certResult
+	results.fingerprints.Add(host, certResult.Fingerprint)
 
-		// save
-		if d.save && len(certs) > 0 {
-			driver.CertsToPEMFile(certs, path.Join(d.savePath, certNode.Fingerprint.HexString())+".pem")
-		}
+	// save
+	if d.save && len(certs) > 0 {
+		driver.CertsToPEMFile(certs, path.Join(d.savePath, certResult.Fingerprint.HexString())+".pem")
 	}
 
 	return results, nil
 }
 
-// GetMX returns the MX records for the provided domain
-func GetMX(domain string) ([]string, error) {
-	// TODO add timeout
+// getMX returns the MX records for the provided domain
+func (d *smtpDriver) getMX(domain string) ([]string, error) {
 	domains := make([]string, 0, 5)
-	mx, err := net.LookupMX(domain)
+	ctx, cancel := context.WithTimeout(context.Background(), d.timeout)
+	defer cancel()
+	mx, err := net.DefaultResolver.LookupMX(ctx, domain)
 	if err != nil {
 		return domains, err
 	}

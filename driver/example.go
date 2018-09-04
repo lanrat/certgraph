@@ -9,18 +9,31 @@ func Example(domain string, driver Driver) error {
 		return err
 	}
 
-	fingerprints, err := certDriver.GetFingerprints()
+	relatedDomains, err := certDriver.GetRelated()
 	if err != nil {
 		return err
 	}
-	for i := range fingerprints {
-		fmt.Println(fingerprints[i].HexString(), " ", fingerprints[i].B64Encode())
-		cert, err := certDriver.QueryCert(fingerprints[i])
-		if err != nil {
-			return err
-		}
-		for j := range cert.Domains {
-			fmt.Println("\t", cert.Domains[j])
+	if len(relatedDomains) > 0 {
+		fmt.Printf("Related:\n")
+	}
+	for _, relatedDomain := range relatedDomains {
+		fmt.Printf("\t%s\n", relatedDomain)
+	}
+
+	fingerprintMap, err := certDriver.GetFingerprints()
+	if err != nil {
+		return err
+	}
+	for domain, fingerprints := range fingerprintMap {
+		for i := range fingerprints {
+			fmt.Printf("%s: %s\n", domain, fingerprints[i].HexString())
+			cert, err := certDriver.QueryCert(fingerprints[i])
+			if err != nil {
+				return err
+			}
+			for j := range cert.Domains {
+				fmt.Println("\t", cert.Domains[j])
+			}
 		}
 	}
 
