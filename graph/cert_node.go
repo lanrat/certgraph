@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/lanrat/certgraph/fingerprint"
-	"golang.org/x/net/publicsuffix"
+	"github.com/lanrat/certgraph/status"
 )
 
 // CertNode graph node to store certificate information
@@ -58,7 +58,7 @@ func (c *CertNode) CDNCert() bool {
 func (c *CertNode) TLDPlus1Count() int {
 	tldPlus1Domains := make(map[string]bool)
 	for _, domain := range c.Domains {
-		tldPlus1, err := publicsuffix.EffectiveTLDPlusOne(domain)
+		tldPlus1, err := status.TLDPlus1(domain)
 		if err != nil {
 			continue
 		}

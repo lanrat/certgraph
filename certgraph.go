@@ -16,6 +16,7 @@ import (
 	"github.com/lanrat/certgraph/driver/http"
 	"github.com/lanrat/certgraph/driver/smtp"
 	"github.com/lanrat/certgraph/graph"
+	"github.com/lanrat/certgraph/status"
 )
 
 var (
@@ -38,8 +39,10 @@ var config struct {
 	driver              string
 	includeCTSubdomains bool
 	includeCTExpired    bool
-	cdn bool
-	maxSANsSize                 int
+	cdn                 bool
+	maxSANsSize         int
+	tldPlus1            bool
+	checkNS             bool
 	printVersion        bool
 }
 
@@ -53,6 +56,8 @@ func init() {
 	flag.BoolVar(&config.includeCTExpired, "ct-expired", false, "include expired certificates in certificate transparency search")
 	flag.IntVar(&config.maxSANsSize, "sanscap", 80, "maximum number of uniq TLD+1 domains in certificate to include, 0 has no limit")
 	flag.BoolVar(&config.cdn, "cdn", false, "include certificates from CDNs")
+	flag.BoolVar(&config.checkNS, "ns", false, "check for NS records to determine if domain is registered")
+	flag.BoolVar(&config.tldPlus1, "tldplus1", false, "for every domain found, add tldPlus1 of the domain's parent")
 	flag.UintVar(&config.maxDepth, "depth", 5, "maximum BFS depth to go")
 	flag.UintVar(&config.parallel, "parallel", 10, "number of certificates to retrieve in parallel")
 	flag.BoolVar(&config.details, "details", false, "print details about the domains crawled")
@@ -92,6 +97,13 @@ func main() {
 		d := strings.ToLower(domain)
 		if len(d) > 0 {
 			startDomains = append(startDomains, cleanInput(d))
+			if config.tldPlus1 {
+				tldPlus1, err := status.TLDPlus1(domain)
+				if err != nil {
+					continue
+				}
+				startDomains = append(startDomains, tldPlus1)
+			}
 		}
 	}
 
@@ -219,6 +231,14 @@ func breathFirstSearch(roots []string) {
 					for _, neighbor := range certGraph.GetDomainNeighbors(domainNode.Domain, config.cdn, config.maxSANsSize) {
 						wg.Add(1)
 						domainNodeInputChan <- graph.NewDomainNode(neighbor, domainNode.Depth+1)
+						if config.tldPlus1 {
+							tldPlus1, err := status.TLDPlus1(neighbor)
+							if err != nil {
+								continue
+							}
+							wg.Add(1)
+							domainNodeInputChan <- graph.NewDomainNode(tldPlus1, domainNode.Depth+1)
+						}
 					}
 				}(domainNode)
 			} else {
@@ -238,6 +258,18 @@ func breathFirstSearch(roots []string) {
 						fmt.Fprintln(os.Stdout, domainNode)
 					} else {
 						fmt.Fprintln(os.Stdout, domainNode.Domain)
+					}
+					if config.checkNS {
+						// TODO these ns lookups are likely done a LOT for many subdomains of the same domain
+						ns, err := status.HasNameservers(domainNode.Domain, config.timeout)
+						if err != nil {
+							v("NS check error:", domainNode.Domain, err)
+							continue
+						}
+						if !ns {
+							// TODO print tldplus1 in a good way
+							fmt.Fprintf(os.Stdout, "Missing NS: %s\n", domainNode.Domain)
+						}
 					}
 				} else if config.details {
 					fmt.Fprintln(os.Stderr, domainNode)

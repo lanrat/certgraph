@@ -28,6 +28,8 @@ OPTIONS:
     	driver to use [crtsh, google, http, smtp] (default "http")
   -json
     	print the graph as json, can be used for graph in web UI
+  -ns
+    	check for NS records to determine if domain is registered
   -parallel uint
     	number of certificates to retrieve in parallel (default 10)
   -sanscap int
@@ -36,6 +38,8 @@ OPTIONS:
     	save certs to folder in PEM format
   -timeout uint
     	tcp timeout in seconds (default 10)
+  -tldplus1
+    	for every domain found, add tldPlus1 of the domain's parent
   -verbose
     	verbose logging
   -version
