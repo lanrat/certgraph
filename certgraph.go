@@ -10,13 +10,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/lanrat/certgraph/dns"
 	"github.com/lanrat/certgraph/driver"
 	"github.com/lanrat/certgraph/driver/crtsh"
 	"github.com/lanrat/certgraph/driver/google"
 	"github.com/lanrat/certgraph/driver/http"
 	"github.com/lanrat/certgraph/driver/smtp"
 	"github.com/lanrat/certgraph/graph"
-	"github.com/lanrat/certgraph/status"
 )
 
 var (
@@ -42,7 +42,8 @@ var config struct {
 	cdn                 bool
 	maxSANsSize         int
 	tldPlus1            bool
-	checkNS             bool
+	updatePSL           bool
+	checkDNS            bool
 	printVersion        bool
 }
 
@@ -56,8 +57,9 @@ func init() {
 	flag.BoolVar(&config.includeCTExpired, "ct-expired", false, "include expired certificates in certificate transparency search")
 	flag.IntVar(&config.maxSANsSize, "sanscap", 80, "maximum number of uniq TLD+1 domains in certificate to include, 0 has no limit")
 	flag.BoolVar(&config.cdn, "cdn", false, "include certificates from CDNs")
-	flag.BoolVar(&config.checkNS, "ns", false, "check for NS records to determine if domain is registered")
+	flag.BoolVar(&config.checkDNS, "dns", false, "check for DNS records to determine if domain is registered")
 	flag.BoolVar(&config.tldPlus1, "tldplus1", false, "for every domain found, add tldPlus1 of the domain's parent")
+	flag.BoolVar(&config.updatePSL, "updatepsl", false, "Update the default Public Suffix List")
 	flag.UintVar(&config.maxDepth, "depth", 5, "maximum BFS depth to go")
 	flag.UintVar(&config.parallel, "parallel", 10, "number of certificates to retrieve in parallel")
 	flag.BoolVar(&config.details, "details", false, "print details about the domains crawled")
@@ -91,6 +93,15 @@ func main() {
 		return
 	}
 
+	// update the public suffix list if required
+	if config.updatePSL {
+		err := dns.UpdatePublicSuffixList(config.timeout)
+		if err != nil {
+			e(err)
+			return
+		}
+	}
+
 	// add domains passed to startDomains
 	startDomains := make([]string, 0, 1)
 	for _, domain := range flag.Args() {
@@ -98,7 +109,7 @@ func main() {
 		if len(d) > 0 {
 			startDomains = append(startDomains, cleanInput(d))
 			if config.tldPlus1 {
-				tldPlus1, err := status.TLDPlus1(domain)
+				tldPlus1, err := dns.TLDPlus1(domain)
 				if err != nil {
 					continue
 				}
@@ -162,7 +173,9 @@ func v(a ...interface{}) {
 }
 
 func e(a ...interface{}) {
-	fmt.Fprintln(os.Stderr, a...)
+	if a != nil {
+		fmt.Fprintln(os.Stderr, a...)
+	}
 }
 
 // prints the graph as a json object
@@ -232,7 +245,7 @@ func breathFirstSearch(roots []string) {
 						wg.Add(1)
 						domainNodeInputChan <- graph.NewDomainNode(neighbor, domainNode.Depth+1)
 						if config.tldPlus1 {
-							tldPlus1, err := status.TLDPlus1(neighbor)
+							tldPlus1, err := dns.TLDPlus1(neighbor)
 							if err != nil {
 								continue
 							}
@@ -254,23 +267,7 @@ func breathFirstSearch(roots []string) {
 			domainNode, more := <-domainNodeOutputChan
 			if more {
 				if !config.printJSON {
-					if config.details {
-						fmt.Fprintln(os.Stdout, domainNode)
-					} else {
-						fmt.Fprintln(os.Stdout, domainNode.Domain)
-					}
-					if config.checkNS {
-						// TODO these ns lookups are likely done a LOT for many subdomains of the same domain
-						ns, err := status.HasNameservers(domainNode.Domain, config.timeout)
-						if err != nil {
-							v("NS check error:", domainNode.Domain, err)
-							continue
-						}
-						if !ns {
-							// TODO print tldplus1 in a good way
-							fmt.Fprintf(os.Stdout, "Missing NS: %s\n", domainNode.Domain)
-						}
-					}
+					printNode(domainNode)
 				} else if config.details {
 					fmt.Fprintln(os.Stderr, domainNode)
 				}
@@ -286,8 +283,16 @@ func breathFirstSearch(roots []string) {
 	<-done // wait for save to finish
 }
 
-// visit visit each node and get and set its neighbors
+// visit visits each node and get and set its neighbors
 func visit(domainNode *graph.DomainNode) {
+	// check NS if necessary
+	if config.checkDNS {
+		_, err := domainNode.CheckForDNS(config.timeout)
+		if err != nil {
+			v("CheckForNS", err)
+		}
+	}
+
 	// perform cert search
 	// TODO do pagination in multiple threads to not block on long searches
 	results, err := certDriver.QueryDomain(domainNode.Domain)
@@ -338,6 +343,21 @@ func visit(domainNode *graph.DomainNode) {
 
 	// we dont process any other certificates returned, they will be collected
 	//  when we process the related domains
+}
+
+func printNode(domainNode *graph.DomainNode) {
+	if config.details {
+		fmt.Fprintln(os.Stdout, domainNode)
+	} else {
+		fmt.Fprintln(os.Stdout, domainNode.Domain)
+	}
+	if config.checkDNS && !domainNode.HasDNS {
+		// TODO print this in a better way
+		// TODO for debugging
+		realDomain, _ := dns.TLDPlus1(domainNode.Domain)
+		fmt.Fprintf(os.Stdout, "* Missing DNS for: %s\n", realDomain)
+
+	}
 }
 
 // certNodeFromCertResult convert certResult to certNode

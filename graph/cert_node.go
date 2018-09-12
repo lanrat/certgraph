@@ -2,11 +2,10 @@ package graph
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
+	"github.com/lanrat/certgraph/dns"
 	"github.com/lanrat/certgraph/fingerprint"
-	"github.com/lanrat/certgraph/status"
 )
 
 // CertNode graph node to store certificate information
@@ -38,18 +37,22 @@ func (c *CertNode) AddFound(driver string) {
 }
 
 // CDNCert returns true if we think the certificate belongs to a CDN
-// very weak detection, only supports fastly & cloudflair
+// very weak detection, only supports fastly & cloudflare
 func (c *CertNode) CDNCert() bool {
 	for _, domain := range c.Domains {
-		// cloudflair
-		matched, _ := regexp.MatchString("([0-9][a-z])*\\.cloudflaressl\\.com", domain)
-		if matched {
+		// cloudflare
+		if strings.HasSuffix(domain, ".cloudflaressl.com") {
 			return true
 		}
 		// fastly
 		if strings.HasSuffix(domain, "fastly.net") {
 			return true
 		}
+		// akamai
+		if strings.HasSuffix(domain, ".akamai.net") {
+			return true
+		}
+
 	}
 	return false
 }
@@ -58,7 +61,7 @@ func (c *CertNode) CDNCert() bool {
 func (c *CertNode) TLDPlus1Count() int {
 	tldPlus1Domains := make(map[string]bool)
 	for _, domain := range c.Domains {
-		tldPlus1, err := status.TLDPlus1(domain)
+		tldPlus1, err := dns.TLDPlus1(domain)
 		if err != nil {
 			continue
 		}

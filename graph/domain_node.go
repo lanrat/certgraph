@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/lanrat/certgraph/dns"
 	"github.com/lanrat/certgraph/fingerprint"
 	"github.com/lanrat/certgraph/status"
 )
@@ -17,6 +19,7 @@ type DomainNode struct {
 	RelatedDomains status.Map
 	Status         status.Status
 	Root           bool
+	HasDNS         bool
 }
 
 // NewDomainNode constructor for DomainNode, converts domain to nonWildcard
@@ -39,6 +42,15 @@ func (d *DomainNode) AddRelatedDomains(domains []string) {
 		}
 		d.RelatedDomains[domain] = status.New(status.UNKNOWN)
 	}
+}
+
+// CheckForDNS checks for the existence of DNS records for the domain's tld+1
+// sets the value to the node and returns the result as well
+func (d *DomainNode) CheckForDNS(timeout time.Duration) (bool, error) {
+	hasDNS, err := dns.HasRecordsCache(d.Domain, timeout)
+
+	d.HasDNS = hasDNS
+	return hasDNS, err
 }
 
 // AddStatusMap adds the status' in the map to the DomainNode
@@ -94,5 +106,6 @@ func (d *DomainNode) ToMap() map[string]string {
 	m["root"] = strconv.FormatBool(d.Root)
 	m["depth"] = strconv.FormatUint(uint64(d.Depth), 10)
 	m["related"] = relatedString
+	m["hasDNS"] = strconv.FormatBool(d.HasDNS)
 	return m
 }

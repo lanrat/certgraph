@@ -47,7 +47,7 @@ type Result interface {
 // FingerprintMap stores a mapping of domains to Fingerprints returned from the driver
 // in the case where multiple domains where queries (redirects, related, etc..) the
 // matching certificates will be in this map
-// the fingerprints returned are guaranted to be a complete result for the domain's certs, but related domains may or may not be complete
+// the fingerprints returned are guaranteed to be a complete result for the domain's certs, but related domains may or may not be complete
 type FingerprintMap map[string][]fingerprint.Fingerprint
 
 // Add adds a domain and fingerprint to the map
