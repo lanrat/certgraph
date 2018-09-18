@@ -78,7 +78,7 @@ Precompiled releases will occasionally be uploaded to the [releases github page]
 
 ### [Docker](https://hub.docker.com/r/lanrat/certgraph/)
 
-Certgraph is an automated build on the Docker Hub!
+CertGraph is an automated build on the Docker Hub!
 
 ```
 $ docker run --rm -it lanrat/certgraph example.com
