@@ -12,7 +12,7 @@ os = $(word 1, $(temp))
 arch = $(word 2, $(temp))
 ext = $(shell if [ "$(os)" = "windows" ]; then echo ".exe"; fi)
 
-.PHONY: all release fmt clean serv $(PLATFORMS)
+.PHONY: all release fmt clean serv $(PLATFORMS) docker
 
 all: certgraph
 
@@ -25,6 +25,9 @@ certgraph: $(SOURCES) $(ALL_SOURCES)
 $(PLATFORMS): $(SOURCES)
 	CGO_ENABLED=0 GOOS=$(os) GOARCH=$(arch) go build $(BUILD_FLAGS) -o 'build/bin/$(os)/$(arch)/certgraph$(ext)' $(SOURCES)
 	mkdir -p build/$(GIT_DATE)/; cd build/bin/$(os)/$(arch)/; zip -r ../../../$(GIT_DATE)/certgraph-$(os)-$(arch)-$(GIT_DATE).zip .; cd ../../../
+
+docker: Dockerfile $(ALL_SOURCES)
+	docker build -t lanrat/certgraph .
 
 fmt:
 	gofmt -s -w -l .
