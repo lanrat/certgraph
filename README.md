@@ -76,7 +76,26 @@ The above output represents the adjacency list for the graph for the root domain
 
 Precompiled releases will occasionally be uploaded to the [releases github page](https://github.com/lanrat/certgraph/releases). https://github.com/lanrat/certgraph/releases
 
-Also available in [BlackArch](https://blackarch.org).
+### [Docker](https://hub.docker.com/r/lanrat/certgraph/)
+
+Certgraph is an automated build on the Docker Hub!
+
+```
+$ docker run --rm -it lanrat/certgraph example.com
+example.com
+www.example.net
+www.example.org
+www.example.com
+example.org
+example.net
+example.edu
+www.example.edu
+```
+
+### Distros
+
+ * [BlackArch](https://blackarch.org)
+
 
 ## Compiling
 
