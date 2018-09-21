@@ -28,6 +28,7 @@ var (
 var certDriver driver.Driver
 
 // config & flags
+// TODO move driver options to own struct
 var config struct {
 	timeout             time.Duration
 	verbose             bool
@@ -148,6 +149,7 @@ func main() {
 
 // setDriver sets the driver variable for the provided driver string and does any necessary driver prep work
 // TODO make config generic and move this to driver module
+// TODO support multi-driver
 func setDriver(driver string) error {
 	var err error
 	switch driver {

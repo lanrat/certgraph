@@ -30,9 +30,12 @@ func init() {
 }
 
 // Base URLs for Google's CT API
-const searchURL1 = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certsearch?include_expired=false&include_subdomains=false&domain=example.com"
-const searchURL2 = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certsearch/page?p=DEADBEEF"
-const certURL = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certbyhash?hash=DEADBEEF"
+const (
+	searchURL1 = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certsearch?include_expired=false&include_subdomains=false&domain=example.com"
+	searchURL2 = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certsearch/page?p=DEADBEEF"
+	certURL    = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certbyhash?hash=DEADBEEF"
+	summaryURL = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/summary"
+)
 
 type googleCT struct {
 	maxPages          float64 // this is a float because that is the type automatically decoded from the JSON response

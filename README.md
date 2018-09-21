@@ -130,3 +130,23 @@ The JSON graph can be sent to the web interface as an uploaded file, remote URL,
 
 [![whitehouse.gov graph](https://cloud.githubusercontent.com/assets/164192/20861407/4775ff26-b944-11e6-888c-4d93e3333494.png)](https://lanrat.github.io/certgraph/?data=https://gist.githubusercontent.com/lanrat/96c47dfee0faaaad633cc830b7e3b997/raw/3c79fed837cb3202e220de21d2a8eb128f4bbd9f/whitehouse.json)
 
+## BygoneSSL detection
+
+### Self Detection
+
+CertGraph can be used to detect [BygoneSSL](https://insecure.design) DoS with the following options. CT-DRIVER can be any Certificate Transparency capable driver.
+Provide all known input domains you own. If any domains you do not own are printed, then you are vulnerable.
+
+```
+certgraph -depth 1 -driver CT-DRIVER -ct-subdomains -cdn -tldplus1 [DOMAIN]...
+```
+
+### Bug Bounty
+
+If you want to find a vulnerable site that has a bug bounty, certgraph can be used with the following options and any driver. But you will have better luck with a non Certificate Transparency driver to ensure that the certificates in question are actually in use
+
+```
+certgraph -cdn -dns -tldplus1 [DOMAIN]...
+```
+
+And domains that print `* Missing DNS for` have vulnerable certificates that should be rotated.

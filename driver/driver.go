@@ -9,6 +9,8 @@ import (
 	"github.com/lanrat/certgraph/status"
 )
 
+// TODO add context instead of timeout on all requests
+
 // Drivers contains all the drivers that have been registered
 var Drivers []string
 
