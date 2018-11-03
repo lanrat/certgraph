@@ -5,7 +5,7 @@ BUILD_FLAGS := -ldflags "-X main.gitDate=$(GIT_DATE) -X main.gitHash=$(GIT_HASH)
 
 PLATFORMS := linux/amd64 linux/386 linux/arm darwin/amd64 windows/amd64 windows/386 openbsd/amd64
 SOURCES := $(shell find . -maxdepth 1 -type f -name "*.go")
-ALL_SOURCES = $(shell find . -type f -name '*.go')
+ALL_SOURCES = $(shell find . -type f -name '*.go') go.mod
 
 temp = $(subst /, ,$@)
 os = $(word 1, $(temp))
@@ -40,3 +40,6 @@ clean:
 
 serv:
 	(cd docs; python -m SimpleHTTPServer)
+
+updateMod:
+	go get -u

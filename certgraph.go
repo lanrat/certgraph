@@ -42,7 +42,7 @@ var config struct {
 	includeCTExpired    bool
 	cdn                 bool
 	maxSANsSize         int
-	tldPlus1            bool
+	apex                bool
 	updatePSL           bool
 	checkDNS            bool
 	printVersion        bool
@@ -56,10 +56,10 @@ func init() {
 	flag.StringVar(&config.driver, "driver", "http", fmt.Sprintf("driver to use [%s]", strings.Join(driver.Drivers, ", ")))
 	flag.BoolVar(&config.includeCTSubdomains, "ct-subdomains", false, "include sub-domains in certificate transparency search")
 	flag.BoolVar(&config.includeCTExpired, "ct-expired", false, "include expired certificates in certificate transparency search")
-	flag.IntVar(&config.maxSANsSize, "sanscap", 80, "maximum number of uniq TLD+1 domains in certificate to include, 0 has no limit")
+	flag.IntVar(&config.maxSANsSize, "sanscap", 80, "maximum number of uniq apex domains in certificate to include, 0 has no limit")
 	flag.BoolVar(&config.cdn, "cdn", false, "include certificates from CDNs")
 	flag.BoolVar(&config.checkDNS, "dns", false, "check for DNS records to determine if domain is registered")
-	flag.BoolVar(&config.tldPlus1, "tldplus1", false, "for every domain found, add tldPlus1 of the domain's parent")
+	flag.BoolVar(&config.apex, "apex", false, "for every domain found, add the apex domain of the domain's parent")
 	flag.BoolVar(&config.updatePSL, "updatepsl", false, "Update the default Public Suffix List")
 	flag.UintVar(&config.maxDepth, "depth", 5, "maximum BFS depth to go")
 	flag.UintVar(&config.parallel, "parallel", 10, "number of certificates to retrieve in parallel")
@@ -109,12 +109,12 @@ func main() {
 		d := strings.ToLower(domain)
 		if len(d) > 0 {
 			startDomains = append(startDomains, cleanInput(d))
-			if config.tldPlus1 {
-				tldPlus1, err := dns.TLDPlus1(domain)
+			if config.apex {
+				apexDomain, err := dns.ApexDomain(domain)
 				if err != nil {
 					continue
 				}
-				startDomains = append(startDomains, tldPlus1)
+				startDomains = append(startDomains, apexDomain)
 			}
 		}
 	}
@@ -246,13 +246,13 @@ func breathFirstSearch(roots []string) {
 					for _, neighbor := range certGraph.GetDomainNeighbors(domainNode.Domain, config.cdn, config.maxSANsSize) {
 						wg.Add(1)
 						domainNodeInputChan <- graph.NewDomainNode(neighbor, domainNode.Depth+1)
-						if config.tldPlus1 {
-							tldPlus1, err := dns.TLDPlus1(neighbor)
+						if config.apex {
+							apexDomain, err := dns.ApexDomain(neighbor)
 							if err != nil {
 								continue
 							}
 							wg.Add(1)
-							domainNodeInputChan <- graph.NewDomainNode(tldPlus1, domainNode.Depth+1)
+							domainNodeInputChan <- graph.NewDomainNode(apexDomain, domainNode.Depth+1)
 						}
 					}
 				}(domainNode)
@@ -356,7 +356,7 @@ func printNode(domainNode *graph.DomainNode) {
 	if config.checkDNS && !domainNode.HasDNS {
 		// TODO print this in a better way
 		// TODO for debugging
-		realDomain, _ := dns.TLDPlus1(domainNode.Domain)
+		realDomain, _ := dns.ApexDomain(domainNode.Domain)
 		fmt.Fprintf(os.Stdout, "* Missing DNS for: %s\n", realDomain)
 
 	}

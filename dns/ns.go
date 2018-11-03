@@ -26,7 +26,7 @@ func noSuchHostDNSError(err error) bool {
 }
 
 // HasRecords does NS, CNAME, A, and AAAA lookups with a timeout
-// returns error when no NS found, does not use TLDPlus1
+// returns error when no NS found, does not use alexDomain
 func HasRecords(domain string, timeout time.Duration) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -68,10 +68,10 @@ func HasRecords(domain string, timeout time.Duration) (bool, error) {
 	return false, nil
 }
 
-// HasRecordsCache returns true if the domain has no DNS records (at the tldplus1 level)
+// HasRecordsCache returns true if the domain has no DNS records (at the apex domain level)
 // uses a cache to store results to prevent lots of DNS lookups
 func HasRecordsCache(domain string, timeout time.Duration) (bool, error) {
-	domain, err := TLDPlus1(domain)
+	domain, err := ApexDomain(domain)
 	if err != nil {
 		return false, err
 	}

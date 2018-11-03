@@ -97,7 +97,7 @@ func (graph *CertGraph) GetDomainNeighbors(domain string, cdn bool, maxSANsSize 
 				certNode := node.(*CertNode)
 				if !cdn && certNode.CDNCert() {
 					//v(domain, "-> CDN CERT")
-				} else if maxSANsSize > 0 && certNode.TLDPlus1Count() > maxSANsSize {
+				} else if maxSANsSize > 0 && certNode.ApexCount() > maxSANsSize {
 					//v(domain, "-> Large CERT")
 				} else {
 					for _, neighbor := range certNode.Domains {

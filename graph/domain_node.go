@@ -44,7 +44,7 @@ func (d *DomainNode) AddRelatedDomains(domains []string) {
 	}
 }
 
-// CheckForDNS checks for the existence of DNS records for the domain's tld+1
+// CheckForDNS checks for the existence of DNS records for the domain's apex
 // sets the value to the node and returns the result as well
 func (d *DomainNode) CheckForDNS(timeout time.Duration) (bool, error) {
 	hasDNS, err := dns.HasRecordsCache(d.Domain, timeout)

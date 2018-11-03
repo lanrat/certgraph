@@ -33,13 +33,13 @@ OPTIONS:
   -parallel uint
     	number of certificates to retrieve in parallel (default 10)
   -sanscap int
-    	maximum number of uniq TLD+1 domains in certificate to include, 0 has no limit (default 80)
+    	maximum number of uniq apex domains in certificate to include, 0 has no limit (default 80)
   -save string
     	save certs to folder in PEM format
   -timeout uint
     	tcp timeout in seconds (default 10)
-  -tldplus1
-    	for every domain found, add tldPlus1 of the domain's parent
+  -apex
+    	for every domain found, add the apex domain of the domain's parent
   -verbose
     	verbose logging
   -version
@@ -138,7 +138,7 @@ CertGraph can be used to detect [BygoneSSL](https://insecure.design) DoS with th
 Provide all known input domains you own. If any domains you do not own are printed, then you are vulnerable.
 
 ```
-certgraph -depth 1 -driver CT-DRIVER -ct-subdomains -cdn -tldplus1 [DOMAIN]...
+certgraph -depth 1 -driver CT-DRIVER -ct-subdomains -cdn -apex [DOMAIN]...
 ```
 
 ### Bug Bounty
@@ -146,7 +146,7 @@ certgraph -depth 1 -driver CT-DRIVER -ct-subdomains -cdn -tldplus1 [DOMAIN]...
 If you want to find a vulnerable site that has a bug bounty, certgraph can be used with the following options and any driver. But you will have better luck with a non Certificate Transparency driver to ensure that the certificates in question are actually in use
 
 ```
-certgraph -cdn -dns -tldplus1 [DOMAIN]...
+certgraph -cdn -dns -apex [DOMAIN]...
 ```
 
 And domains that print `* Missing DNS for` have vulnerable certificates that should be rotated.

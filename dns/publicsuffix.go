@@ -36,7 +36,7 @@ func UpdatePublicSuffixList(timeout time.Duration) error {
 	return err
 }
 
-// TLDPlus1 returns TLD+1 of domain
-func TLDPlus1(domain string) (string, error) {
+// ApexDomain returns TLD+1 of domain
+func ApexDomain(domain string) (string, error) {
 	return publicsuffix.DomainFromListWithOptions(suffixList, domain, suffixListFindOptions)
 }

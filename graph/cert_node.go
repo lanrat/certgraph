@@ -57,17 +57,17 @@ func (c *CertNode) CDNCert() bool {
 	return false
 }
 
-// TLDPlus1Count the number of tld+1 domains in the certificate
-func (c *CertNode) TLDPlus1Count() int {
-	tldPlus1Domains := make(map[string]bool)
+// ApexCount the number of tld+1 domains in the certificate
+func (c *CertNode) ApexCount() int {
+	apexDomains := make(map[string]bool)
 	for _, domain := range c.Domains {
-		tldPlus1, err := dns.TLDPlus1(domain)
+		apexDomain, err := dns.ApexDomain(domain)
 		if err != nil {
 			continue
 		}
-		tldPlus1Domains[tldPlus1] = true
+		apexDomains[apexDomain] = true
 	}
-	return len(tldPlus1Domains)
+	return len(apexDomains)
 }
 
 // ToMap returns a map of the CertNode's fields (weak serialization)
