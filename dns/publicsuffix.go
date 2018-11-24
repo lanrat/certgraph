@@ -14,7 +14,6 @@ var (
 	}
 	suffixListURL = "https://publicsuffix.org/list/public_suffix_list.dat"
 	suffixList    = publicsuffix.DefaultList
-	nsCache       = make(map[string]bool)
 )
 
 // UpdatePublicSuffixList gets a new copy of the public suffix list from the internat and updates the built in copy with the new rules
