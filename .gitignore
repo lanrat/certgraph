@@ -1,4 +1,3 @@
-go.sum
 certgraph
 build/
 *.json
