@@ -55,7 +55,7 @@ func (c *smtpCertDriver) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResu
 	if found {
 		return cert, nil
 	}
-	return nil, fmt.Errorf("Certificate with Fingerprint %s not found", fp.HexString())
+	return nil, fmt.Errorf("certificate with Fingerprint %s not found", fp.HexString())
 }
 
 // Driver creates a new SSL driver for SMTP Connections

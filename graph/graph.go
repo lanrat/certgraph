@@ -21,13 +21,6 @@ func NewCertGraph() *CertGraph {
 	return graph
 }
 
-// LoadOrStoreCert will return the CertNode in the graph with the provided node's fingerprint, or store the node if it did not already exist
-// returned bool is true if the CertNode was found, false if stored
-func (graph *CertGraph) LoadOrStoreCert(certNode *CertNode) (*CertNode, bool) {
-	foundCertNode, ok := graph.certs.LoadOrStore(certNode.Fingerprint, certNode)
-	return foundCertNode.(*CertNode), ok
-}
-
 // AddCert add a CertNode to the graph
 func (graph *CertGraph) AddCert(certNode *CertNode) {
 	// save the cert to the graph

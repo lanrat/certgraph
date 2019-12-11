@@ -162,7 +162,7 @@ func setDriver(driver string) error {
 	case "smtp":
 		certDriver, err = smtp.Driver(config.timeout, config.savePath)
 	default:
-		return fmt.Errorf("Unknown driver name: %s", config.driver)
+		return fmt.Errorf("unknown driver name: %s", config.driver)
 	}
 	return err
 }
