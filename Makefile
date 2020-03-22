@@ -1,7 +1,7 @@
 GIT_DATE := $(shell git log -1 --date=short --pretty='%cd' | tr -d -)
 GIT_HASH := $(shell git rev-parse HEAD)
 
-BUILD_FLAGS := -trimpath -ldflags "-X main.gitDate=$(GIT_DATE) -X main.gitHash=$(GIT_HASH)"
+BUILD_FLAGS := -trimpath -ldflags "-w -s -X main.gitDate=$(GIT_DATE) -X main.gitHash=$(GIT_HASH)"
 
 PLATFORMS := linux/amd64 linux/386 linux/arm darwin/amd64 windows/amd64 windows/386 openbsd/amd64
 SOURCES := $(shell find . -maxdepth 1 -type f -name "*.go")
