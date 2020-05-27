@@ -1,13 +1,11 @@
+// Package crtsh implements an unofficial API client for Comodo's
+// Certificate Transparency search
+// https://crt.sh/
+//
+// As the API is unofficial and has been reverse engineered it may stop working
+// at any time and comes with no guarantees.
+//
 package crtsh
-
-/*
- * This file implements an unofficial API client for Comodo's
- * Certificate Transparency search
- * https://crt.sh/
- *
- * As the API is unofficial and has been reverse engineered it may stop working
- * at any time and comes with no guarantees.
- */
 
 // TODO running in verbose gives error: pq: unnamed prepared statement does not exist
 
@@ -76,8 +74,11 @@ func Driver(maxQueryResults int, timeout time.Duration, savePath string, include
 	}
 
 	d.db, err = sql.Open("postgres", connStr)
+	if err != nil {
+		return nil, err
+	}
 
-	d.setSQLTimeout(d.timeout.Seconds())
+	err = d.setSQLTimeout(d.timeout.Seconds())
 
 	return d, err
 }
@@ -199,7 +200,10 @@ func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error
 
 	for rows.Next() {
 		var domain string
-		rows.Scan(&domain)
+		err = rows.Scan(&domain)
+		if err != nil {
+			return nil, err
+		}
 		certNode.Domains = append(certNode.Domains, domain)
 	}
 
@@ -214,7 +218,10 @@ func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error
 			return certNode, err
 		}
 
-		driver.RawCertToPEMFile(rawCert, path.Join(d.savePath, fp.HexString())+".pem")
+		err = driver.RawCertToPEMFile(rawCert, path.Join(d.savePath, fp.HexString())+".pem")
+		if err != nil {
+			return certNode, err
+		}
 	}
 
 	return certNode, nil

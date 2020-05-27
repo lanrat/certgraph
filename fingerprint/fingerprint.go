@@ -1,3 +1,4 @@
+// Package fingerprint defines types to define a certificate fingerprint for certgraph
 package fingerprint
 
 import (

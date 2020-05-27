@@ -1,3 +1,4 @@
+// Package dns adds utility functions for performing dns queries
 package dns
 
 import (

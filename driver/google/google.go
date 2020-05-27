@@ -1,13 +1,11 @@
+// Package google file implements an unofficial API client for Google's
+// Certificate Transparency search
+// https://transparencyreport.google.com/https/certificates
+//
+// As the API is unofficial and has been reverse engineered it may stop working
+// at any time and comes with no guarantees.
+//
 package google
-
-/*
- * This file implements an unofficial API client for Google's
- * Certificate Transparency search
- * https://transparencyreport.google.com/https/certificates
- *
- * As the API is unofficial and has been reverse engineered it may stop working
- * at any time and comes with no guarantees.
- */
 
 import (
 	"encoding/json"

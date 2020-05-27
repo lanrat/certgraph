@@ -75,7 +75,7 @@ func (d *DomainNode) GetCertificates() []fingerprint.Fingerprint {
 	return fingerprints
 }
 
-// get the string representation of a node
+// String returns the string representation of a node
 func (d *DomainNode) String() string {
 	certString := ""
 	// Certs

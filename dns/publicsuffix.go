@@ -30,7 +30,7 @@ func UpdatePublicSuffixList(timeout time.Duration) error {
 	}
 	defer resp.Body.Close()
 	newSuffixList := publicsuffix.NewList()
-	newSuffixList.Load(resp.Body, suffixListParseOptions)
+	_, err = newSuffixList.Load(resp.Body, suffixListParseOptions)
 	suffixList = newSuffixList
 	return err
 }

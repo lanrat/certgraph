@@ -1,3 +1,4 @@
+// Package status defines the various status certgraph discovered hosts/certificates may have
 package status
 
 import (
@@ -64,7 +65,7 @@ const (
 	CT       = iota
 )
 
-// return domain status for printing
+// String returns the domain status for printing
 func (status DomainStatus) String() string {
 	switch status {
 	case UNKNOWN:

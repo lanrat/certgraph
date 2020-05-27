@@ -1,3 +1,4 @@
+// Package driver exposes interfaces and types certgraph drivers must implement
 package driver
 
 import (

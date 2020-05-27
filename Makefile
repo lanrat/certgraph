@@ -12,7 +12,7 @@ os = $(word 1, $(temp))
 arch = $(word 2, $(temp))
 ext = $(shell if [ "$(os)" = "windows" ]; then echo ".exe"; fi)
 
-.PHONY: all release fmt clean serv $(PLATFORMS) docker
+.PHONY: all release fmt clean serv $(PLATFORMS) docker check
 
 all: certgraph
 
@@ -37,6 +37,10 @@ install: $(SOURCES) $(ALL_SOURCES)
 
 clean:
 	rm -r certgraph build/
+
+check:
+	golangci-lint run --exclude-use-default || true
+	staticcheck -unused.whole-program -checks all ./...
 
 serv:
 	(cd docs; python -m SimpleHTTPServer)

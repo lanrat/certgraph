@@ -1,3 +1,4 @@
+// Package http implements a certgraph driver for obtaining SSL certificates over https
 package http
 
 import (
@@ -151,7 +152,7 @@ func (c *httpCertDriver) dialTLS(network, addr string) (net.Conn, error) {
 
 	// save
 	if c.parent.save && len(connState.PeerCertificates) > 0 {
-		driver.CertsToPEMFile(connState.PeerCertificates, path.Join(c.parent.savePath, certResult.Fingerprint.HexString())+".pem")
+		err = driver.CertsToPEMFile(connState.PeerCertificates, path.Join(c.parent.savePath, certResult.Fingerprint.HexString())+".pem")
 	}
 
 	return conn, err

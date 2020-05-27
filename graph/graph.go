@@ -1,3 +1,4 @@
+// Package graph implements the graph data structures used by certgraph to build the certificate graph
 package graph
 
 import (

@@ -1,3 +1,4 @@
+// Package smtp implements a certgraph driver for obtaining SSL certificates over smtp with STARTTLS
 package smtp
 
 import (
@@ -134,10 +135,10 @@ func (d *smtpDriver) QueryDomain(host string) (driver.Result, error) {
 
 	// save
 	if d.save && len(certs) > 0 {
-		driver.CertsToPEMFile(certs, path.Join(d.savePath, certResult.Fingerprint.HexString())+".pem")
+		err = driver.CertsToPEMFile(certs, path.Join(d.savePath, certResult.Fingerprint.HexString())+".pem")
 	}
 
-	return results, nil
+	return results, err
 }
 
 // getMX returns the MX records for the provided domain
