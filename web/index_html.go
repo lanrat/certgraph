@@ -1,4 +1,8 @@
-<!DOCTYPE html>
+package web
+
+// Code generated on "Mon Aug  3 13:51:43 PDT 2020" DO NOT EDIT.
+
+const indexSource = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -519,4 +523,5 @@ resetGraph();
 d3.json(dataURL, createGraph); 
 </script>
 </body>
-</html>
+</html>`
+

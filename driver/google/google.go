@@ -32,7 +32,8 @@ const (
 	searchURL1 = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certsearch?include_expired=false&include_subdomains=false&domain=example.com"
 	searchURL2 = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certsearch/page?p=DEADBEEF"
 	certURL    = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/certbyhash?hash=DEADBEEF"
-	summaryURL = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/summary"
+	//summaryURL is not currently used
+	//summaryURL = "https://transparencyreport.google.com/transparencyreport/api/v3/httpsreport/ct/summary"
 )
 
 type googleCT struct {

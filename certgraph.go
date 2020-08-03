@@ -17,6 +17,7 @@ import (
 	"github.com/lanrat/certgraph/driver/http"
 	"github.com/lanrat/certgraph/driver/smtp"
 	"github.com/lanrat/certgraph/graph"
+	"github.com/lanrat/certgraph/web"
 )
 
 var (
@@ -46,6 +47,7 @@ var config struct {
 	updatePSL           bool
 	checkDNS            bool
 	printVersion        bool
+	serve               string
 }
 
 func init() {
@@ -66,6 +68,8 @@ func init() {
 	flag.BoolVar(&config.details, "details", false, "print details about the domains crawled")
 	flag.BoolVar(&config.printJSON, "json", false, "print the graph as json, can be used for graph in web UI")
 	flag.StringVar(&config.savePath, "save", "", "save certs to folder in PEM format")
+	flag.StringVar(&config.serve, "serve", "", "address:port to serve html UI on")
+
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s: [OPTION]... HOST...\n\thttps://github.com/lanrat/certgraph\nOPTIONS:\n", os.Args[0])
 		flag.PrintDefaults()
@@ -79,6 +83,11 @@ func main() {
 	if config.printVersion {
 		fmt.Println(version())
 		return
+	}
+
+	if len(config.serve) > 0 {
+		err := web.Serve(config.serve)
+		e(err)
 	}
 
 	// print usage if no domain passed
@@ -343,7 +352,7 @@ func visit(domainNode *graph.DomainNode) {
 		domainNode.AddCertFingerprint(certNode.Fingerprint, certDriver.GetName())
 	}
 
-	// we dont process any other certificates returned, they will be collected
+	// we don't process any other certificates returned, they will be collected
 	//  when we process the related domains
 }
 
