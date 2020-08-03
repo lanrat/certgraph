@@ -1,6 +1,6 @@
 package web
 
-// Code generated on "Mon Aug  3 13:51:43 PDT 2020" DO NOT EDIT.
+// Code generated on "Mon Aug  3 14:01:58 PDT 2020" DO NOT EDIT.
 
 const indexSource = `<!DOCTYPE html>
 <html>
