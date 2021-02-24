@@ -22,10 +22,10 @@ type DomainNode struct {
 	HasDNS         bool
 }
 
-// NewDomainNode constructor for DomainNode, converts domain to nonWildcard
+// NewDomainNode constructor for DomainNode, converts domain to lower nonWildcard
 func NewDomainNode(domain string, depth uint) *DomainNode {
 	domainNode := new(DomainNode)
-	domainNode.Domain = nonWildcard(domain)
+	domainNode.Domain = nonWildcard(strings.ToLower(domain))
 	domainNode.Depth = depth
 	domainNode.Certs = make(map[fingerprint.Fingerprint][]string)
 	domainNode.RelatedDomains = make(status.Map)
