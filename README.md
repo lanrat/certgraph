@@ -36,6 +36,8 @@ OPTIONS:
         print the graph as json, can be used for graph in web UI
   -parallel uint
         number of certificates to retrieve in parallel (default 10)
+  -regex string
+        regex domains must match to be part of the graph
   -sanscap int
         maximum number of uniq apex domains in certificate to include, 0 has no limit (default 80)
   -save string

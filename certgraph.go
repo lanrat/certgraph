@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -21,10 +22,17 @@ import (
 	"github.com/lanrat/certgraph/web"
 )
 
+// version vars
 var (
 	gitDate   = "none"
 	gitHash   = "master"
 	certGraph = graph.NewCertGraph()
+)
+
+// temp flag vars
+var (
+	timeoutSeconds uint
+	regexString    string
 )
 
 // webContent holds our static web server content.
@@ -53,10 +61,10 @@ var config struct {
 	checkDNS            bool
 	printVersion        bool
 	serve               string
+	regex               *regexp.Regexp
 }
 
 func init() {
-	var timeoutSeconds uint
 	flag.BoolVar(&config.printVersion, "version", false, "print version and exit")
 	flag.UintVar(&timeoutSeconds, "timeout", 10, "tcp timeout in seconds")
 	flag.BoolVar(&config.verbose, "verbose", false, "verbose logging")
@@ -74,24 +82,36 @@ func init() {
 	flag.BoolVar(&config.printJSON, "json", false, "print the graph as json, can be used for graph in web UI")
 	flag.StringVar(&config.savePath, "save", "", "save certs to folder in PEM format")
 	flag.StringVar(&config.serve, "serve", "", "address:port to serve html UI on")
+	flag.StringVar(&regexString, "regex", "", "regex domains must match to be part of the graph")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s: [OPTION]... HOST...\n\thttps://github.com/lanrat/certgraph\nOPTIONS:\n", os.Args[0])
 		flag.PrintDefaults()
 	}
-	flag.Parse()
-	config.timeout = time.Duration(timeoutSeconds) * time.Second
 }
 
 func main() {
+	flag.Parse()
+	config.timeout = time.Duration(timeoutSeconds) * time.Second
+	var err error
+
 	// check for version flag
 	if config.printVersion {
 		fmt.Println(version())
 		return
 	}
 
+	// check for regex
+	if len(regexString) > 0 {
+		config.regex, err = regexp.Compile(regexString)
+		if err != nil {
+			e(err)
+			return
+		}
+	}
+
 	if len(config.serve) > 0 {
-		err := web.Serve(config.serve, webContent)
+		err = web.Serve(config.serve, webContent)
 		e(err)
 		return
 	}
@@ -111,7 +131,7 @@ func main() {
 
 	// update the public suffix list if required
 	if config.updatePSL {
-		err := dns.UpdatePublicSuffixList(config.timeout)
+		err = dns.UpdatePublicSuffixList(config.timeout)
 		if err != nil {
 			e(err)
 			return
@@ -135,7 +155,7 @@ func main() {
 	}
 
 	// set driver
-	err := setDriver(config.driver)
+	err = setDriver(config.driver)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -253,6 +273,13 @@ func breathFirstSearch(roots []string) {
 					// wait for pass
 					<-threadPass
 					defer func() { threadPass <- true }()
+
+					// regex match check
+					if config.regex != nil && !config.regex.MatchString(domainNode.Domain) {
+						// skip domain that does not match regex
+						v("domain does not match regex, skipping :", domainNode.Domain)
+						return
+					}
 
 					// operate on the node
 					v("Visiting", domainNode.Depth, domainNode.Domain)
