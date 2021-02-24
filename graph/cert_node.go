@@ -3,6 +3,7 @@ package graph
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/lanrat/certgraph/dns"
 	"github.com/lanrat/certgraph/fingerprint"
@@ -10,9 +11,10 @@ import (
 
 // CertNode graph node to store certificate information
 type CertNode struct {
-	Fingerprint fingerprint.Fingerprint
-	Domains     []string
-	foundMap    map[string]bool
+	Fingerprint  fingerprint.Fingerprint
+	Domains      []string
+	foundMap     map[string]bool
+	foundMapLock sync.Mutex
 }
 
 func (c *CertNode) String() string {
@@ -30,6 +32,8 @@ func (c *CertNode) Found() []string {
 
 // AddFound adds a driver name to the source of the certificate
 func (c *CertNode) AddFound(driver string) {
+	c.foundMapLock.Lock()
+	defer c.foundMapLock.Unlock()
 	if c.foundMap == nil {
 		c.foundMap = make(map[string]bool)
 	}
