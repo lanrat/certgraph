@@ -37,6 +37,7 @@ func NewDomainNode(domain string, depth uint) *DomainNode {
 // in the map
 func (d *DomainNode) AddRelatedDomains(domains []string) {
 	for _, domain := range domains {
+		domain = strings.ToLower(domain)
 		if _, ok := d.RelatedDomains[domain]; ok {
 			continue
 		}
