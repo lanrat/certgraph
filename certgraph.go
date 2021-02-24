@@ -17,6 +17,7 @@ import (
 	"github.com/lanrat/certgraph/driver/crtsh"
 	"github.com/lanrat/certgraph/driver/google"
 	"github.com/lanrat/certgraph/driver/http"
+	"github.com/lanrat/certgraph/driver/multi"
 	"github.com/lanrat/certgraph/driver/smtp"
 	"github.com/lanrat/certgraph/graph"
 	"github.com/lanrat/certgraph/web"
@@ -68,7 +69,7 @@ func init() {
 	flag.BoolVar(&config.printVersion, "version", false, "print version and exit")
 	flag.UintVar(&timeoutSeconds, "timeout", 10, "tcp timeout in seconds")
 	flag.BoolVar(&config.verbose, "verbose", false, "verbose logging")
-	flag.StringVar(&config.driver, "driver", "http", fmt.Sprintf("driver to use [%s]", strings.Join(driver.Drivers, ", ")))
+	flag.StringVar(&config.driver, "driver", "http", fmt.Sprintf("driver(s) to use [%s]", strings.Join(driver.Drivers, ", ")))
 	flag.BoolVar(&config.includeCTSubdomains, "ct-subdomains", false, "include sub-domains in certificate transparency search")
 	flag.BoolVar(&config.includeCTExpired, "ct-expired", false, "include expired certificates in certificate transparency search")
 	flag.IntVar(&config.maxSANsSize, "sanscap", 80, "maximum number of uniq apex domains in certificate to include, 0 has no limit")
@@ -155,7 +156,7 @@ func main() {
 	}
 
 	// set driver
-	err = setDriver(config.driver)
+	certDriver, err = setDriver(config.driver)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
@@ -182,24 +183,40 @@ func main() {
 	v("Graph Depth:", certGraph.DomainDepth())
 }
 
-// setDriver sets the driver variable for the provided driver string and does any necessary driver prep work
-// TODO make config generic and move this to driver module
-// TODO support multi-driver
-func setDriver(driver string) error {
-	var err error
-	switch driver {
-	case "google":
-		certDriver, err = google.Driver(50, config.savePath, config.includeCTSubdomains, config.includeCTExpired)
-	case "crtsh":
-		certDriver, err = crtsh.Driver(1000, config.timeout, config.savePath, config.includeCTSubdomains, config.includeCTExpired)
-	case "http":
-		certDriver, err = http.Driver(config.timeout, config.savePath)
-	case "smtp":
-		certDriver, err = smtp.Driver(config.timeout, config.savePath)
-	default:
-		return fmt.Errorf("unknown driver name: %s", config.driver)
+func setDriver(name string) (driver.Driver, error) {
+	if strings.Contains(name, ",") {
+		names := strings.Split(name, ",")
+		drivers := make([]driver.Driver, 0, len(names))
+		for _, driverName := range names {
+			d, err := getDriverSingle(driverName)
+			if err != nil {
+				return nil, err
+			}
+			drivers = append(drivers, d)
+		}
+		return multi.Driver(drivers), nil
 	}
-	return err
+	return getDriverSingle(name)
+}
+
+// getDriverSingle sets the driver variable for the provided driver string and does any necessary driver prep work
+// TODO make config generic and move this to driver module
+func getDriverSingle(name string) (driver.Driver, error) {
+	var err error
+	var d driver.Driver
+	switch name {
+	case "google":
+		d, err = google.Driver(50, config.savePath, config.includeCTSubdomains, config.includeCTExpired)
+	case "crtsh":
+		d, err = crtsh.Driver(1000, config.timeout, config.savePath, config.includeCTSubdomains, config.includeCTExpired)
+	case "http":
+		d, err = http.Driver(config.timeout, config.savePath)
+	case "smtp":
+		d, err = smtp.Driver(config.timeout, config.savePath)
+	default:
+		return nil, fmt.Errorf("unknown driver name: %s", config.driver)
+	}
+	return d, err
 }
 
 // verbose logging

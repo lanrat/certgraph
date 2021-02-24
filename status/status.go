@@ -63,6 +63,7 @@ const (
 	ERROR    = iota
 	REDIRECT = iota
 	CT       = iota
+	MULTI    = iota
 )
 
 // String returns the domain status for printing
@@ -84,6 +85,8 @@ func (status DomainStatus) String() string {
 		return "Redirect"
 	case CT:
 		return "CT"
+	case MULTI:
+		return "MULTI"
 	}
 	return "?"
 }

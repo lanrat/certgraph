@@ -31,7 +31,7 @@ OPTIONS:
   -dns
         check for DNS records to determine if domain is registered
   -driver string
-        driver to use [crtsh, google, http, smtp] (default "http")
+        driver(s) to use [crtsh, google, http, smtp] (default "http")
   -json
         print the graph as json, can be used for graph in web UI
   -parallel uint
