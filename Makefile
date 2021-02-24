@@ -3,7 +3,7 @@ GIT_HASH := $(shell git rev-parse HEAD)
 
 BUILD_FLAGS := -trimpath -ldflags "-w -s -X main.gitDate=$(GIT_DATE) -X main.gitHash=$(GIT_HASH)"
 
-PLATFORMS := linux/amd64 linux/386 linux/arm darwin/amd64 windows/amd64 windows/386 openbsd/amd64
+PLATFORMS := linux/amd64 linux/386 linux/arm linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/386 openbsd/amd64
 SOURCES := $(shell find . -maxdepth 1 -type f -name "*.go")
 ALL_SOURCES = $(shell find . -type f -name '*.go') go.mod docs/*
 
