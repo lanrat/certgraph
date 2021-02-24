@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -25,6 +26,10 @@ var (
 	gitHash   = "master"
 	certGraph = graph.NewCertGraph()
 )
+
+// webContent holds our static web server content.
+//go:embed docs/*
+var webContent embed.FS
 
 var certDriver driver.Driver
 
@@ -86,8 +91,9 @@ func main() {
 	}
 
 	if len(config.serve) > 0 {
-		err := web.Serve(config.serve)
+		err := web.Serve(config.serve, webContent)
 		e(err)
+		return
 	}
 
 	// print usage if no domain passed

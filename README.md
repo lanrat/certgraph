@@ -106,7 +106,7 @@ www.example.edu
 
 ## Compiling
 
-To compile certgraph you must have a working go 1.13 or newer compiler on your system, as certgraph makes use of go's modules for dependencies.
+To compile certgraph you must have a working go 1.16 or newer compiler on your system.
 To compile for the running system compilation is as easy as running make
 
 ```console

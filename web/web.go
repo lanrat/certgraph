@@ -2,18 +2,25 @@
 package web
 
 import (
-	"fmt"
+	"io/fs"
+	"log"
 	"net/http"
 )
 
-//go:generate ./generate.sh
-
 // Serve starts a very basic webserver serving the embed web UI
-func Serve(addr string) error {
-	http.HandleFunc("/", indexHandler)
-	return http.ListenAndServe(addr, nil)
+func Serve(addr string, data fs.FS) error {
+	data, err := fs.Sub(data, "docs")
+	if err != nil {
+		return err
+	}
+	http.Handle("/", http.FileServer(http.FS(data)))
+	return http.ListenAndServe(addr, logRequest(http.DefaultServeMux))
 }
 
-func indexHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "%s", indexSource)
+// very minimal request logger
+func logRequest(handler http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("%s %s %s\n", r.RemoteAddr, r.Method, r.URL)
+		handler.ServeHTTP(w, r)
+	})
 }

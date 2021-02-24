@@ -5,7 +5,7 @@ BUILD_FLAGS := -trimpath -ldflags "-w -s -X main.gitDate=$(GIT_DATE) -X main.git
 
 PLATFORMS := linux/amd64 linux/386 linux/arm darwin/amd64 windows/amd64 windows/386 openbsd/amd64
 SOURCES := $(shell find . -maxdepth 1 -type f -name "*.go")
-ALL_SOURCES = $(shell find . -type f -name '*.go') go.mod web/index_html.go
+ALL_SOURCES = $(shell find . -type f -name '*.go') go.mod docs/*
 
 temp = $(subst /, ,$@)
 os = $(word 1, $(temp))
@@ -26,9 +26,6 @@ $(PLATFORMS): $(SOURCES)
 	CGO_ENABLED=0 GOOS=$(os) GOARCH=$(arch) go build $(BUILD_FLAGS) -o 'build/bin/$(os)/$(arch)/certgraph$(ext)' $(SOURCES)
 	mkdir -p build/$(GIT_DATE)/; cd build/bin/$(os)/$(arch)/; zip -r ../../../$(GIT_DATE)/certgraph-$(os)-$(arch)-$(GIT_DATE).zip .; cd ../../../
 
-web/index_html.go: docs/index.html
-	go generate -x ./...
-
 docker: Dockerfile $(ALL_SOURCES)
 	docker build -t lanrat/certgraph .
 
@@ -39,7 +36,7 @@ install: $(SOURCES) $(ALL_SOURCES)
 	go install $(BUILD_FLAGS)
 
 clean:
-	rm -rf certgraph build/ web/index_html.go
+	rm -rf certgraph build/
 
 check: | lint check1 check2
 
