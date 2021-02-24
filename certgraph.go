@@ -446,6 +446,7 @@ func generateGraphMetadata() map[string]interface{} {
 	options["sanscap"] = config.maxSANsSize
 	options["cdn"] = config.cdn
 	options["timeout"] = config.timeout
+	options["regex"] = regexString
 	data["options"] = options
 	return data
 }
