@@ -1,3 +1,4 @@
+// Package multi exposes a generic driver interface allowing you to merge the results of multiple other drivers
 package multi
 
 import (

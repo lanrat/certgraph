@@ -12,7 +12,7 @@ os = $(word 1, $(temp))
 arch = $(word 2, $(temp))
 ext = $(shell if [ "$(os)" = "windows" ]; then echo ".exe"; fi)
 
-.PHONY: all release fmt clean serv $(PLATFORMS) docker check
+.PHONY: all release fmt clean serv $(PLATFORMS) docker check deps
 
 all: certgraph
 
@@ -28,6 +28,11 @@ $(PLATFORMS): $(SOURCES)
 
 docker: Dockerfile $(ALL_SOURCES)
 	docker build -t lanrat/certgraph .
+
+deps: go.mod
+	GOPROXY=direct go mod download
+	GOPROXY=direct go get -u all
+	go mod tidy
 
 fmt:
 	gofmt -s -w -l .
