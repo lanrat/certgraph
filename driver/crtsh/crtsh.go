@@ -4,14 +4,14 @@
 //
 // As the API is unofficial and has been reverse engineered it may stop working
 // at any time and comes with no guarantees.
+// view SQL excample: https://crt.sh/?showSQL=Y&exclude=expired&q=
 //
 package crtsh
-
-// TODO running in verbose gives error: pq: unnamed prepared statement does not exist
 
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"path"
 	"time"
 
@@ -21,8 +21,10 @@ import (
 	_ "github.com/lib/pq" // portgresql
 )
 
-const connStr = "postgresql://guest@crt.sh/certwatch?sslmode=disable"
+const connStr = "postgresql://guest@crt.sh/certwatch?sslmode=disable&fallback_application_name=certgraph&binary_parameters=yes"
 const driverName = "crtsh"
+
+const debug = false
 
 func init() {
 	driver.AddDriver(driverName)
@@ -99,45 +101,43 @@ func (d *crtsh) QueryDomain(domain string) (driver.Result, error) {
 		driver:       d,
 	}
 
-	queryStr := ""
-
-	if d.includeSubdomains {
-		if d.includeExpired {
-			queryStr = `SELECT digest(certificate.certificate, 'sha256') sha256
-					FROM certificate_identity, certificate
-					WHERE certificate.id = certificate_identity.certificate_id
-					AND (reverse(lower(certificate_identity.name_value)) LIKE reverse(lower('%%.'||$1))
-                	OR reverse(lower(certificate_identity.name_value)) LIKE reverse(lower($1)))
-					LIMIT $2`
-		} else {
-			queryStr = `SELECT digest(certificate.certificate, 'sha256') sha256
-					FROM certificate_identity, certificate
-					WHERE certificate.id = certificate_identity.certificate_id
-					AND x509_notAfter(certificate.certificate) > statement_timestamp()
-					AND (reverse(lower(certificate_identity.name_value)) LIKE reverse(lower('%%.'||$1))
-                	OR reverse(lower(certificate_identity.name_value)) LIKE reverse(lower($1)))
-					LIMIT $2`
-		}
-	} else {
-		if d.includeExpired {
-			queryStr = `SELECT digest(certificate.certificate, 'sha256') sha256
-					FROM certificate_identity, certificate
-					WHERE certificate.id = certificate_identity.certificate_id
-					AND reverse(lower(certificate_identity.name_value)) LIKE reverse(lower($1))
-					LIMIT $2`
-		} else {
-			queryStr = `SELECT digest(certificate.certificate, 'sha256') sha256
-					FROM certificate_identity, certificate
-					WHERE certificate.id = certificate_identity.certificate_id
-					AND x509_notAfter(certificate.certificate) > statement_timestamp()
-					AND reverse(lower(certificate_identity.name_value)) LIKE reverse(lower($1))
-					LIMIT $2`
-		}
-	}
-
-	if d.includeSubdomains {
-		domain = fmt.Sprintf("%%.%s", domain)
-	}
+	queryStr := `WITH myconstants (include_expired, include_subdomains) as (
+		values ($1::bool, $2::bool)
+	 ),
+	 ci AS (
+		 SELECT digest(sub.CERTIFICATE, 'sha256') sha256, -- added
+				min(sub.CERTIFICATE_ID) ID,
+				min(sub.ISSUER_CA_ID) ISSUER_CA_ID,
+				array_agg(DISTINCT sub.NAME_VALUE) NAME_VALUES
+			 FROM (SELECT *
+					   FROM certificate_and_identities cai, myconstants
+					   WHERE plainto_tsquery('certwatch', $4) @@ identities(cai.CERTIFICATE)
+						  AND (
+							  -- domain only
+							  (NOT myconstants.include_subdomains AND cai.NAME_VALUE ILIKE ($4))
+							  OR
+							  -- include sub-domains
+							  (myconstants.include_subdomains AND (cai.NAME_VALUE ILIKE ($4) OR cai.NAME_VALUE ILIKE ('%.' || $4)))
+						  )
+						   AND (
+							   -- added
+							   cai.NAME_TYPE = '2.5.4.3' -- commonName
+							   OR
+								 cai.NAME_TYPE = 'san:dNSName' -- dNSName
+							   )
+						   AND
+							   -- include expired?
+							   (myconstants.include_expired OR (coalesce(x509_notAfter(cai.CERTIFICATE), 'infinity'::timestamp) >= date_trunc('year', now() AT TIME ZONE 'UTC')
+							   AND x509_notAfter(cai.CERTIFICATE) >= now() AT TIME ZONE 'UTC'))
+					   LIMIT $3
+				  ) sub
+			 GROUP BY sub.CERTIFICATE
+	 )
+	 SELECT
+		 ci.sha256 -- added
+		 --array_to_string(ci.name_values, chr(10)) name_value,
+		 --ci.id id
+		 FROM ci;`
 
 	try := 0
 	var err error
@@ -145,9 +145,15 @@ func (d *crtsh) QueryDomain(domain string) (driver.Result, error) {
 	for try < 5 {
 		// this is a hack while crt.sh gets there stuff togeather
 		try++
-		rows, err = d.db.Query(queryStr, domain, d.queryLimit)
+		if debug {
+			log.Printf("QueryDomain try %d: %s", try, queryStr)
+		}
+		rows, err = d.db.Query(queryStr, d.includeExpired, d.includeSubdomains, d.queryLimit, domain)
 		if err == nil {
 			break
+		}
+		if debug {
+			log.Printf("crtsh pq error on domain %q: %s", domain, err.Error())
 		}
 	}
 	/*if try > 1 {
@@ -166,6 +172,10 @@ func (d *crtsh) QueryDomain(domain string) (driver.Result, error) {
 		results.fingerprints.Add(domain, fingerprint.FromHashBytes(hash))
 	}
 
+	if debug {
+		log.Printf("crtsh: got %d results for %s.", len(results.fingerprints[domain]), domain)
+	}
+
 	return results, nil
 }
 
@@ -174,11 +184,7 @@ func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error
 	certNode.Fingerprint = fp
 	certNode.Domains = make([]string, 0, 5)
 
-	queryStr := `SELECT DISTINCT certificate_identity.name_value
-				FROM certificate, certificate_identity
-				WHERE certificate.id = certificate_identity.certificate_id
-				AND certificate_identity.name_type in ('dNSName', 'commonName')
-				AND digest(certificate.certificate, 'sha256') = $1`
+	queryStr := `SELECT DISTINCT name_value FROM certificate_and_identities WHERE digest(certificate, 'sha256') = $1;`
 
 	try := 0
 	var err error
@@ -209,9 +215,7 @@ func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error
 
 	if d.save {
 		var rawCert []byte
-		queryStr = `SELECT certificate.certificate
-					FROM certificate
-					WHERE digest(certificate.certificate, 'sha256') = $1`
+		queryStr = `SELECT certificate FORM certificate_and_identities WHERE digest(certificate, 'sha256') = $1;`
 		row := d.db.QueryRow(queryStr, fp[:])
 		err = row.Scan(&rawCert)
 		if err != nil {
