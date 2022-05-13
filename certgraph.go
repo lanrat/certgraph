@@ -14,6 +14,7 @@ import (
 
 	"github.com/lanrat/certgraph/dns"
 	"github.com/lanrat/certgraph/driver"
+	"github.com/lanrat/certgraph/driver/censys"
 	"github.com/lanrat/certgraph/driver/crtsh"
 	"github.com/lanrat/certgraph/driver/google"
 	"github.com/lanrat/certgraph/driver/http"
@@ -213,6 +214,8 @@ func getDriverSingle(name string) (driver.Driver, error) {
 		d, err = http.Driver(config.timeout, config.savePath)
 	case "smtp":
 		d, err = smtp.Driver(config.timeout, config.savePath)
+	case "censys":
+		d, err = censys.Driver(config.savePath, config.includeCTSubdomains, config.includeCTExpired)
 	default:
 		return nil, fmt.Errorf("unknown driver name: %s", config.driver)
 	}

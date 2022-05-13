@@ -12,7 +12,7 @@ os = $(word 1, $(temp))
 arch = $(word 2, $(temp))
 ext = $(shell if [ "$(os)" = "windows" ]; then echo ".exe"; fi)
 
-.PHONY: all release fmt clean serv $(PLATFORMS) docker check deps
+.PHONY: all release fmt clean serv $(PLATFORMS) docker check deps update-deps
 
 all: certgraph
 
@@ -32,7 +32,6 @@ docker: Dockerfile $(ALL_SOURCES)
 deps: go.mod
 	GOPROXY=direct go mod download
 	GOPROXY=direct go get -u all
-	go mod tidy
 
 fmt:
 	gofmt -s -w -l .
@@ -57,5 +56,9 @@ lint:
 serv: certgraph
 	./certgraph --serve 127.0.0.1:8080
 
-updateMod:
+update-deps:
 	go get -u
+	go mod tidy
+
+test:
+	go test -v ./... | grep -v "\[no test files\]"

@@ -31,7 +31,7 @@ OPTIONS:
   -dns
         check for DNS records to determine if domain is registered
   -driver string
-        driver(s) to use [crtsh, google, http, smtp] (default "http")
+        driver(s) to use [censys, crtsh, google, http, smtp] (default "http")
   -json
         print the graph as json, can be used for graph in web UI
   -parallel uint
@@ -61,6 +61,8 @@ CertGraph has multiple options for querying SSL certificates. The driver is resp
 * **http** this is the default driver which works by connecting to the hosts over HTTPS and retrieving the certificates from the SSL connection
 
 * **smtp** like the *http* driver, but connects over port 25 and issues the *starttls* command to retrieve the certificates from the SSL connection
+
+* **censys** this driver searches Certificate Transparency logs via [censys.io](https://search.censys.io/certificates). No packets are sent to any of the domains when using this driver. Requires Censys API keys
 
 * **crtsh** this driver searches Certificate Transparency logs via [crt.sh](https://crt.sh/). No packets are sent to any of the domains when using this driver
 

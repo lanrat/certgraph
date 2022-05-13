@@ -160,7 +160,7 @@ func (d *googleCT) QueryDomain(domain string) (driver.Result, error) {
 		foundCerts := raw[0][1].([]interface{})
 		for _, foundCert := range foundCerts {
 			certHash := foundCert.([]interface{})[5].(string)
-			certFP := fingerprint.FromB64(certHash)
+			certFP := fingerprint.FromB64Hash(certHash)
 			results.fingerprints.Add(domain, certFP)
 		}
 		//fmt.Println("Page:", pageInfo[3])

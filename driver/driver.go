@@ -69,7 +69,7 @@ func NewCertResult(cert *x509.Certificate) *CertResult {
 	certResult := new(CertResult)
 
 	// generate Fingerprint
-	certResult.Fingerprint = fingerprint.FromBytes(cert.Raw)
+	certResult.Fingerprint = fingerprint.FromRawCertBytes(cert.Raw)
 
 	// domains
 	// used to ensure uniq entries in domains array
