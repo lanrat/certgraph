@@ -1,5 +1,7 @@
 package main
 
+// cSpell:words certgraph crtsh
+
 import (
 	"embed"
 	"encoding/json"
@@ -38,6 +40,7 @@ var (
 )
 
 // webContent holds our static web server content.
+//
 //go:embed docs/*
 var webContent embed.FS
 
@@ -387,7 +390,7 @@ func visit(domainNode *graph.DomainNode) {
 	// fingerprints for the domain queried
 	fingerprints := fingerprintMap[domainNode.Domain]
 	for _, fp := range fingerprints {
-		// add certnode to graph
+		// add certNode to graph
 		certNode, exists := certGraph.GetCert(fp)
 		if !exists {
 			// get cert details

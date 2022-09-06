@@ -1,3 +1,9 @@
+// Package censys file implements a client to search Censys's CT database
+// Certificate Transparency search
+// https://transparencyreport.google.com/https/certificates
+//
+// As the API is unofficial and has been reverse engineered it may stop working
+// at any time and comes with no guarantees.
 package censys
 
 import (
@@ -21,7 +27,7 @@ const driverName = "censys"
 
 var debug = false
 
-// TODO support rate limits & pagnation
+// TODO support rate limits & pagination
 
 var (
 	defaultHTTPClient = &http.Client{}
@@ -65,7 +71,7 @@ func (c *censysCertDriver) QueryCert(fp fingerprint.Fingerprint) (*driver.CertRe
 	return c.driver.QueryCert(fp)
 }
 
-// TODO support pagnation
+// TODO support pagination
 func domainSearchParam(domain string, includeExpired, includeSubdomain bool) certSearchParam {
 	var s certSearchParam
 	if includeSubdomain {
@@ -133,7 +139,7 @@ func (d *censys) request(method, url string, request io.Reader) (*http.Response,
 	return resp, err
 }
 
-// jsonRequest performes a request to the API endpoint sending and receiving JSON objects
+// jsonRequest performs a request to the API endpoint sending and receiving JSON objects
 func (d *censys) jsonRequest(method, url string, request, response interface{}) error {
 	var payloadReader io.Reader
 	if request != nil {
@@ -164,7 +170,7 @@ func (d *censys) jsonRequest(method, url string, request, response interface{}) 
 		err := fmt.Errorf("error on request %s, got Status %s %s", url, resp.Status, http.StatusText(resp.StatusCode))
 		jsonError := json.NewDecoder(resp.Body).Decode(&errorResp)
 		if jsonError != nil {
-			return fmt.Errorf("error decoding json %w on errord request: %s", jsonError, err.Error())
+			return fmt.Errorf("error decoding json %w on error request: %s", jsonError, err.Error())
 		}
 		return fmt.Errorf("%w, HTTPStatus: %d Message: %q", err, errorResp.ErrorCode, errorResp.Error)
 	}

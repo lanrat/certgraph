@@ -2,6 +2,8 @@ package censys
 
 import "time"
 
+// cSpell:ignore spki noct zlint fatals precert
+
 type certSearchParam struct {
 	Query   string   `json:"query"`
 	Page    uint     `json:"page"`

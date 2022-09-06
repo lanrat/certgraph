@@ -1,10 +1,10 @@
 module github.com/lanrat/certgraph
 
 require (
-	github.com/lib/pq v1.10.5
-	github.com/weppos/publicsuffix-go v0.15.0
-	golang.org/x/net v0.0.0-20220425223048-2871e0cb64e4 // indirect
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
+	github.com/lib/pq v1.10.6
+	github.com/weppos/publicsuffix-go v0.20.0
+	golang.org/x/net v0.0.0-20220906165146-f3363e06e74c // indirect
+	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
 )
 
 go 1.16

@@ -4,13 +4,12 @@
 //
 // As the API is unofficial and has been reverse engineered it may stop working
 // at any time and comes with no guarantees.
-//
 package google
 
 import (
 	"encoding/json"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -20,6 +19,8 @@ import (
 	"github.com/lanrat/certgraph/fingerprint"
 	"github.com/lanrat/certgraph/status"
 )
+
+// cSpell:ignore cdsr
 
 const driverName = "google"
 
@@ -96,7 +97,7 @@ func (d *googleCT) getJSONP(url string, target interface{}) error {
 		return errors.New("Got non OK HTTP status: '" + r.Status + "' on URL: " + url)
 	}
 
-	respData, err := ioutil.ReadAll(r.Body)
+	respData, err := io.ReadAll(r.Body)
 	if err != nil {
 		return err
 	}
@@ -138,7 +139,7 @@ func (d *googleCT) QueryDomain(domain string) (driver.Result, error) {
 			return results, err
 		}
 
-		// simple corectness checks
+		// simple correctness checks
 		if raw[0][0] != "https.ct.cdsr" {
 			return results, errors.New("Got Unexpected Query output: " + raw[0][0].(string))
 		}
@@ -148,7 +149,7 @@ func (d *googleCT) QueryDomain(domain string) (driver.Result, error) {
 			break
 		}
 		if len(raw[0][3].([]interface{})) != 5 {
-			// pageinfo result not correct length, likely no results
+			// pageInfo result not correct length, likely no results
 			//fmt.Println(raw[0])
 			break
 		}
@@ -205,7 +206,7 @@ func (d *googleCT) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, er
 		return certNode, err
 	}
 
-	// simple corectness checks
+	// simple correctness checks
 	if raw[0][0] != "https.ct.chr" {
 		return certNode, errors.New("Got Unexpected Cert output: " + raw[0][0].(string))
 	}
