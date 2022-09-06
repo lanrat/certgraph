@@ -42,13 +42,16 @@ install: $(SOURCES) $(ALL_SOURCES)
 clean:
 	rm -rf certgraph build/
 
-check: | lint check1 check2
+check: | lint check1 check2 vulncheck
 
 check1:
 	golangci-lint run
 
 check2:
 	staticcheck -f stylish -checks all ./...
+
+vulncheck:
+	govulncheck ./...
 
 lint:
 	golint ./...
