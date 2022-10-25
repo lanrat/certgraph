@@ -17,41 +17,45 @@ Usage of ./certgraph: [OPTION]... HOST...
         https://github.com/lanrat/certgraph
 OPTIONS:
   -apex
-        for every domain found, add the apex domain of the domain's parent
+     for every domain found, add the apex domain of the domain's parent
   -cdn
-        include certificates from CDNs
+     include certificates from CDNs
+  -censys-appid string
+     censys API AppID
+  -censys-secret string
+     censys API Secret
   -ct-expired
-        include expired certificates in certificate transparency search
+     include expired certificates in certificate transparency search
   -ct-subdomains
-        include sub-domains in certificate transparency search
+     include sub-domains in certificate transparency search
   -depth uint
-        maximum BFS depth to go (default 5)
+     maximum BFS depth to go (default 5)
   -details
-        print details about the domains crawled
+     print details about the domains crawled
   -dns
-        check for DNS records to determine if domain is registered
+     check for DNS records to determine if domain is registered
   -driver string
-        driver(s) to use [censys, crtsh, google, http, smtp] (default "http")
+     driver(s) to use [censys, crtsh, google, http, smtp] (default "http")
   -json
-        print the graph as json, can be used for graph in web UI
+     print the graph as json, can be used for graph in web UI
   -parallel uint
-        number of certificates to retrieve in parallel (default 10)
+     number of certificates to retrieve in parallel (default 10)
   -regex string
-        regex domains must match to be part of the graph
+     regex domains must match to be part of the graph
   -sanscap int
-        maximum number of uniq apex domains in certificate to include, 0 has no limit (default 80)
+     maximum number of uniq apex domains in certificate to include, 0 has no limit (default 80)
   -save string
-        save certs to folder in PEM format
+     save certs to folder in PEM format
   -serve string
-        address:port to serve html UI on
+     address:port to serve html UI on
   -timeout uint
-        tcp timeout in seconds (default 10)
+     tcp timeout in seconds (default 10)
   -updatepsl
-        Update the default Public Suffix List
+     Update the default Public Suffix List
   -verbose
-        verbose logging
+     verbose logging
   -version
-        print version and exit
+     print version and exit
 ```
 
 ## Drivers
