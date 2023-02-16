@@ -35,7 +35,7 @@ OPTIONS:
   -dns
      check for DNS records to determine if domain is registered
   -driver string
-     driver(s) to use [censys, crtsh, google, http, smtp] (default "http")
+     driver(s) to use [censys, crtsh, http, smtp] (default "http")
   -json
      print the graph as json, can be used for graph in web UI
   -parallel uint
@@ -70,7 +70,6 @@ CertGraph has multiple options for querying SSL certificates. The driver is resp
 
 * **crtsh** this driver searches Certificate Transparency logs via [crt.sh](https://crt.sh/). No packets are sent to any of the domains when using this driver
 
-* **google** this is another Certificate Transparency driver that behaves like *crtsh* but uses the [Google Certificate Transparency Lookup Tool](https://transparencyreport.google.com/https/certificates)
 
 ## Example
 

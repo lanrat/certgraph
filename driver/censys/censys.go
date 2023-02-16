@@ -1,6 +1,5 @@
 // Package censys file implements a client to search Censys's CT database
 // Certificate Transparency search
-// https://transparencyreport.google.com/https/certificates
 //
 // As the API is unofficial and has been reverse engineered it may stop working
 // at any time and comes with no guarantees.

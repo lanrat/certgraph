@@ -18,7 +18,6 @@ import (
 	"github.com/lanrat/certgraph/driver"
 	"github.com/lanrat/certgraph/driver/censys"
 	"github.com/lanrat/certgraph/driver/crtsh"
-	"github.com/lanrat/certgraph/driver/google"
 	"github.com/lanrat/certgraph/driver/http"
 	"github.com/lanrat/certgraph/driver/multi"
 	"github.com/lanrat/certgraph/driver/smtp"
@@ -209,8 +208,6 @@ func getDriverSingle(name string) (driver.Driver, error) {
 	var err error
 	var d driver.Driver
 	switch name {
-	case "google":
-		d, err = google.Driver(50, config.savePath, config.includeCTSubdomains, config.includeCTExpired)
 	case "crtsh":
 		d, err = crtsh.Driver(1000, config.timeout, config.savePath, config.includeCTSubdomains, config.includeCTExpired)
 	case "http":
