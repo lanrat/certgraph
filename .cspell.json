@@ -7,9 +7,18 @@
     "language": "en",
     // words - list of words to be always considered correct
     "words": [
+        "Buildx",
         "censys",
         "certgraph",
-        "crtsh"
+        "crtsh",
+        "elif",
+        "GOARCH",
+        "golangci",
+        "GOPROXY",
+        "goreleaser",
+        "ldflags",
+        "serv",
+        "trimpath"
     ],
     // flagWords - list of words to be always considered incorrect
     // This is useful for offensive words and common spelling errors.

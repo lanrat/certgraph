@@ -1,67 +1,44 @@
-GIT_DATE := $(shell git log -1 --date=short --pretty='%cd' | tr -d -)
-GIT_HASH := $(shell git rev-parse HEAD)
+default: certgraph
 
-BUILD_FLAGS := -trimpath -ldflags "-w -s -X main.gitDate=$(GIT_DATE) -X main.gitHash=$(GIT_HASH)"
+RELEASE_DEPS = fmt lint
+include release.mk
 
-PLATFORMS := linux/amd64 linux/386 linux/arm linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/386 openbsd/amd64
+BUILD_FLAGS := -trimpath -ldflags "-w -s -X main.version=${VERSION}"
+
 SOURCES := $(shell find . -maxdepth 1 -type f -name "*.go")
 ALL_SOURCES = $(shell find . -type f -name '*.go') go.mod docs/*
 
-temp = $(subst /, ,$@)
-os = $(word 1, $(temp))
-arch = $(word 2, $(temp))
-ext = $(shell if [ "$(os)" = "windows" ]; then echo ".exe"; fi)
-
-.PHONY: all release fmt clean serv $(PLATFORMS) docker check deps update-deps
-
-all: certgraph
-
-release: $(PLATFORMS)
-	rm -r build/bin/
+.PHONY: release fmt clean serv docker lint deps update-deps
 
 certgraph: $(SOURCES) $(ALL_SOURCES)
-	go build $(BUILD_FLAGS) -o $@ $(SOURCES)
-
-$(PLATFORMS): $(SOURCES)
-	CGO_ENABLED=0 GOOS=$(os) GOARCH=$(arch) go build $(BUILD_FLAGS) -o 'build/bin/$(os)/$(arch)/certgraph$(ext)' $(SOURCES)
-	mkdir -p build/$(GIT_DATE)/; cd build/bin/$(os)/$(arch)/; zip -r ../../../$(GIT_DATE)/certgraph-$(os)-$(arch)-$(GIT_DATE).zip .; cd ../../../
+	go build $(BUILD_FLAGS) -o $@ .
 
 docker: Dockerfile $(ALL_SOURCES)
-	docker build -t lanrat/certgraph .
+	docker build --build-arg VERSION=${VERSION} -t lanrat/certgraph .
 
 deps: go.mod
 	GOPROXY=direct go mod download
 	GOPROXY=direct go get -u all
 
-fmt:
-	gofmt -s -w -l .
-
-install: $(SOURCES) $(ALL_SOURCES)
-	go install $(BUILD_FLAGS)
-
-clean:
-	rm -rf certgraph build/
-
-check: | lint check1 check2 vulncheck
-
-check1:
-	golangci-lint run
-
-check2:
-	staticcheck -f stylish -checks all ./...
-
-vulncheck:
-	govulncheck ./...
-
-lint:
-	golint ./...
-
-serv: certgraph
-	./certgraph --serve 127.0.0.1:8080
-
 update-deps:
 	go get -u
 	go mod tidy
 
+fmt:
+	go fmt ./...
+
+clean:
+	rm -rf certgraph dist/
+
+lint:
+	golangci-lint run
+
+serv: certgraph
+	./certgraph --serve 127.0.0.1:8080
+
 test:
 	go test -v ./... | grep -v "\[no test files\]"
+
+.PHONY: goreleaser
+goreleaser:
+	goreleaser release --snapshot --clean

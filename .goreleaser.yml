@@ -1,0 +1,44 @@
+# .goreleaser.yml
+version: 2
+project_name: certgraph
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: certgraph
+    main: .
+    binary: certgraph
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - # This single archive definition handles all OSes.
+    # The default format is 'tar.gz', which is used for linux and darwin.
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: ['zip'] # Override the format to 'zip' for Windows builds.
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'

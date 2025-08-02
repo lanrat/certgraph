@@ -1,4 +1,4 @@
 Dockerfile
 certgraph
-build/
+dist/
 *.json

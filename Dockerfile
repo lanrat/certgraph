@@ -1,11 +1,23 @@
-FROM golang:alpine
+# build stage
+FROM golang:alpine AS build-env
+RUN apk update && apk add --no-cache make git
 
-RUN apk add --update git make
+# Accept VERSION as a build argument
+ARG VERSION
+ENV VERSION=${VERSION}
 
-WORKDIR /src/certgraph
-ADD . .
+WORKDIR /go/app/
+COPY go.mod go.sum ./
+RUN go mod download
 
-ENV CGO_ENABLED=0
-RUN make install
+COPY . .
+RUN make
+
+# final stage
+FROM alpine
+
+COPY --from=build-env /go/app/certgraph /bin/
+
+USER 1000
 
 ENTRYPOINT [ "certgraph" ]
