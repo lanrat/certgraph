@@ -36,9 +36,10 @@ import (
 )
 
 var (
-	version        = "dev"
-	certGraph      = graph.NewCertGraph()
-	processedCerts = make(map[fingerprint.Fingerprint]bool) // Session-wide cache for processed certificates
+	version             = "dev"
+	certGraph           = graph.NewCertGraph()
+	processedCerts      = make(map[fingerprint.Fingerprint]bool) // Session-wide cache for processed certificates
+	processedCertsMutex sync.Mutex                               // Protects processedCerts map
 )
 
 // temp flag vars
@@ -408,7 +409,6 @@ func visit(domainNode *graph.DomainNode) {
 	}
 	domainNode.AddRelatedDomains(relatedDomains)
 
-	// TODO parallelize this
 	// TODO fix printing domains as they are found with new driver
 	// add cert nodes to graph
 	fingerprintMap, err := results.GetFingerprints()
@@ -419,32 +419,88 @@ func visit(domainNode *graph.DomainNode) {
 
 	// fingerprints for the domain queried
 	fingerprints := fingerprintMap[domainNode.Domain]
+	
+	// Parallelize certificate processing using worker pool
+	type certWork struct {
+		fp fingerprint.Fingerprint
+		result *graph.CertNode
+		err error
+	}
+	
+	certChan := make(chan fingerprint.Fingerprint, len(fingerprints))
+	resultChan := make(chan certWork, len(fingerprints))
+	
+	// Start worker goroutines
+	numWorkers := min(config.parallel, uint(len(fingerprints)))
+	if numWorkers == 0 {
+		numWorkers = 1
+	}
+	
+	for i := uint(0); i < numWorkers; i++ {
+		go func() {
+			for fp := range certChan {
+				var work certWork
+				work.fp = fp
+				
+				// Check if we've already attempted to process this certificate
+				processedCertsMutex.Lock()
+				if processedCerts[fp] {
+					processedCertsMutex.Unlock()
+					work.err = fmt.Errorf("already processed")
+					resultChan <- work
+					continue
+				}
+				processedCerts[fp] = true
+				processedCertsMutex.Unlock()
+
+				// get cert details
+				certResult, err := results.QueryCert(ctx, fp)
+				if err != nil {
+					work.err = err
+					resultChan <- work
+					continue
+				}
+
+				work.result = certNodeFromCertResult(certResult)
+				resultChan <- work
+			}
+		}()
+	}
+	
+	// Send work to workers
+	workCount := 0
 	for _, fp := range fingerprints {
-		// add certNode to graph
-		certNode, exists := certGraph.GetCert(fp)
-		if !exists {
-			// Check if we've already attempted to process this certificate
-			if processedCerts[fp] {
-				v("Certificate processing already attempted, skipping:", fp.HexString())
-				continue
-			}
-
-			// Mark as being processed to avoid duplicate attempts
-			processedCerts[fp] = true
-
-			// get cert details
-			certResult, err := results.QueryCert(ctx, fp)
-			if err != nil {
-				v("QueryCert", err)
-				continue
-			}
-
-			certNode = certNodeFromCertResult(certResult)
-			certGraph.AddCert(certNode)
+		// Check if cert already exists in graph
+		if _, exists := certGraph.GetCert(fp); exists {
+			continue
 		}
-
-		certNode.AddFound(certDriver.GetName())
-		domainNode.AddCertFingerprint(certNode.Fingerprint, certDriver.GetName())
+		certChan <- fp
+		workCount++
+	}
+	close(certChan)
+	
+	// Collect results
+	for i := 0; i < workCount; i++ {
+		work := <-resultChan
+		if work.err != nil {
+			if work.err.Error() != "already processed" {
+				v("QueryCert", work.err)
+			}
+			continue
+		}
+		
+		if work.result != nil {
+			certGraph.AddCert(work.result)
+		}
+	}
+	
+	// Add relationships after all certificates are processed
+	for _, fp := range fingerprints {
+		certNode, exists := certGraph.GetCert(fp)
+		if exists {
+			certNode.AddFound(certDriver.GetName())
+			domainNode.AddCertFingerprint(certNode.Fingerprint, certDriver.GetName())
+		}
 	}
 
 	// we don't process any other certificates returned, they will be collected
@@ -460,10 +516,12 @@ func printNode(domainNode *graph.DomainNode) {
 		_, _ = fmt.Fprintln(os.Stdout, domainNode.Domain)
 	}
 	if config.checkDNS && !domainNode.HasDNS {
-		// TODO print this in a better way
-		// TODO for debugging
 		realDomain, _ := dns.ApexDomain(domainNode.Domain)
-		_, _ = fmt.Fprintf(os.Stdout, "* Missing DNS for: %s\n", realDomain)
+		if config.details {
+			_, _ = fmt.Fprintf(os.Stdout, "  ⚠ DNS resolution failed for apex domain: %s\n", realDomain)
+		} else {
+			_, _ = fmt.Fprintf(os.Stdout, "  [NO DNS] %s\n", realDomain)
+		}
 
 	}
 }

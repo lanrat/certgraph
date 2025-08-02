@@ -71,16 +71,19 @@ func newResult(host string) *multiResult {
 	r.host = host
 	r.results = make([]driver.Result, 0, 2)
 	r.fingerprints = make(driver.FingerprintMap)
+	r.seenFPs = make(map[fingerprint.Fingerprint]bool)
 	return r
 }
 
 // multiResult aggregates results from multiple drivers for a single domain query.
 // It provides thread-safe access to merged certificate fingerprints and related data.
 type multiResult struct {
-	host         string                // The queried domain
-	results      []driver.Result       // Results from individual drivers
-	resultLock   sync.Mutex            // Protects results and fingerprints maps
-	fingerprints driver.FingerprintMap // Merged fingerprints from all drivers
+	host           string                              // The queried domain
+	results        []driver.Result                     // Results from individual drivers
+	resultLock     sync.Mutex                          // Protects results and fingerprints maps
+	fingerprints   driver.FingerprintMap               // Merged fingerprints from all drivers
+	seenFPs        map[fingerprint.Fingerprint]bool    // Tracks fingerprints to prevent duplicates
+	driverStatuses []status.Map                        // Individual driver status reports
 }
 
 // add merges a driver result into this multiResult instance.
@@ -94,11 +97,16 @@ func (c *multiResult) add(r driver.Result) error {
 	}
 	for domain := range fpm {
 		for _, fp := range fpm[domain] {
-			// TODO does not dedupe across drivers
-			c.fingerprints.Add(domain, fp)
+			// Check if we've already seen this fingerprint to dedupe across drivers
+			if !c.seenFPs[fp] {
+				c.seenFPs[fp] = true
+				c.fingerprints.Add(domain, fp)
+			}
 		}
 	}
 
+	// Store individual driver status
+	c.driverStatuses = append(c.driverStatuses, r.GetStatus())
 	c.results = append(c.results, r)
 	return nil
 }
@@ -123,10 +131,25 @@ func (c *multiResult) GetFingerprints() (driver.FingerprintMap, error) {
 	return c.fingerprints, nil
 }
 
-// GetStatus returns a status map indicating this is a multi-driver result.
-// TODO: Consider nesting individual driver statuses for more detailed reporting.
+// GetStatus returns a comprehensive status map including individual driver statuses.
+// Provides detailed reporting for each driver used in the multi-driver query.
 func (c *multiResult) GetStatus() status.Map {
-	return status.NewMap(c.host, status.New(status.MULTI))
+	c.resultLock.Lock()
+	defer c.resultLock.Unlock()
+	
+	// Create main multi-driver status
+	multiStatus := status.NewMap(c.host, status.New(status.MULTI))
+	
+	// Add individual driver statuses with prefixed keys for identification
+	for i, driverStatus := range c.driverStatuses {
+		for domain, stat := range driverStatus {
+			// Prefix with driver index to avoid conflicts
+			key := fmt.Sprintf("%s_driver_%d", domain, i)
+			multiStatus[key] = stat
+		}
+	}
+	
+	return multiStatus
 }
 
 // GetRelated returns a deduplicated list of related domains from all drivers.
