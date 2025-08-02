@@ -207,7 +207,7 @@ func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error
 	certNode.Fingerprint = fp
 	certNode.Domains = make([]string, 0, 5)
 
-	queryStr := `SELECT DISTINCT name_value FROM certificate_and_identities WHERE digest(certificate, 'sha256') = $1;`
+	queryStr := `SELECT DISTINCT NAME_VALUE FROM certificate_and_identities WHERE digest(certificate, 'sha256') = $1 AND (NAME_TYPE = '2.5.4.3' OR NAME_TYPE = 'san:dNSName');`
 
 	try := 0
 	var err error
