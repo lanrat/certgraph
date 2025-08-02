@@ -35,21 +35,21 @@ func FromRawCertBytes(data []byte) Fingerprint {
 }
 
 // FromB64Hash returns a Fingerprint from a base64 encoded hash string
-func FromB64Hash(hash string) Fingerprint {
+func FromB64Hash(hash string) (Fingerprint, error) {
 	data, err := base64.StdEncoding.DecodeString(hash)
 	if err != nil {
-		panic(err)
+		return Fingerprint{}, err
 	}
-	return FromHashBytes(data)
+	return FromHashBytes(data), nil
 }
 
 // FromHexHash returns a Fingerprint from a hex encoded hash string
-func FromHexHash(hash string) Fingerprint {
+func FromHexHash(hash string) (Fingerprint, error) {
 	decoded, err := hex.DecodeString(hash)
 	if err != nil {
-		panic(err)
+		return Fingerprint{}, err
 	}
-	return FromHashBytes(decoded)
+	return FromHashBytes(decoded), nil
 }
 
 // B64Encode returns the b64 string of a Fingerprint

@@ -203,7 +203,11 @@ func (d *censys) QueryDomain(domain string) (driver.Result, error) {
 	}
 
 	for _, r := range resp.Results {
-		fp := fingerprint.FromHexHash(r.Fingerprint)
+		fp, err := fingerprint.FromHexHash(r.Fingerprint)
+		if err != nil {
+			log.Printf("censys: invalid fingerprint %s: %v", r.Fingerprint, err)
+			continue
+		}
 		results.fingerprints.Add(domain, fp)
 	}
 

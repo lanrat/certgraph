@@ -129,6 +129,9 @@ func (d *smtpDriver) QueryDomain(host string) (driver.Result, error) {
 	}
 
 	// only look at leaf certificate which is valid for domain, rest of cert chain is ignored
+	if len(certs) == 0 {
+		return results, fmt.Errorf("no certificates found")
+	}
 	certResult := driver.NewCertResult(certs[0])
 	results.certs[certResult.Fingerprint] = certResult
 	results.fingerprints.Add(host, certResult.Fingerprint)

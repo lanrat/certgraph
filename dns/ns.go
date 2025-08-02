@@ -4,11 +4,12 @@ package dns
 import (
 	"context"
 	"net"
+	"sync"
 	"time"
 )
 
 var (
-	dnsCache    = make(map[string]bool)
+	dnsCache    = &sync.Map{}
 	dnsResolver = &net.Resolver{}
 )
 
@@ -76,13 +77,12 @@ func HasRecordsCache(domain string, timeout time.Duration) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	hasDNS, found := dnsCache[domain]
-	if found {
-		return hasDNS, nil
+	if cached, found := dnsCache.Load(domain); found {
+		return cached.(bool), nil
 	}
 	hasRecords, err := HasRecords(domain, timeout)
-	if err != nil {
-		dnsCache[domain] = hasRecords
+	if err == nil {
+		dnsCache.Store(domain, hasRecords)
 	}
 	return hasRecords, err
 }

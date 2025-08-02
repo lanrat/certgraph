@@ -165,7 +165,7 @@ func main() {
 
 	// create the output directory if it does not exist
 	if len(config.savePath) > 0 {
-		err := os.MkdirAll(config.savePath, 0777)
+		err := os.MkdirAll(config.savePath, 0755)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			return
@@ -215,7 +215,7 @@ func getDriverSingle(name string) (driver.Driver, error) {
 	case "censys":
 		d, err = censys.Driver(config.savePath, config.includeCTSubdomains, config.includeCTExpired)
 	default:
-		return nil, fmt.Errorf("unknown driver name: %s", config.driver)
+		return nil, fmt.Errorf("unknown driver name: %s", name)
 	}
 	return d, err
 }
@@ -272,8 +272,7 @@ func breathFirstSearch(roots []string) {
 	}()
 	// thread to start all other threads from DomainChan
 	go func() {
-		for {
-			domainNode := <-domainNodeInputChan
+		for domainNode := range domainNodeInputChan {
 
 			// depth check
 			if domainNode.Depth > config.maxDepth {
@@ -341,6 +340,7 @@ func breathFirstSearch(roots []string) {
 	}()
 
 	wg.Wait() // wait for querying to finish
+	close(domainNodeInputChan) // close input channel to signal goroutine to exit
 	close(domainNodeOutputChan)
 	<-done // wait for save to finish
 }

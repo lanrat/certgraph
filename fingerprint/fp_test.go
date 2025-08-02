@@ -61,7 +61,10 @@ func TestFromRawCertBytes(t *testing.T) {
 
 func TestFromB64Hash(t *testing.T) {
 
-	fp := fingerprint.FromB64Hash(fpHashB64)
+	fp, err := fingerprint.FromB64Hash(fpHashB64)
+	if err != nil {
+		t.Fatalf("FromB64Hash failed: %v", err)
+	}
 
 	uppercaseHash := strings.ToUpper(fpHashHex)
 	hashHex := fp.HexString()
@@ -79,7 +82,10 @@ func TestFromB64Hash(t *testing.T) {
 
 func TestFromHexHash(t *testing.T) {
 
-	fp := fingerprint.FromHexHash(fpHashHex)
+	fp, err := fingerprint.FromHexHash(fpHashHex)
+	if err != nil {
+		t.Fatalf("FromHexHash failed: %v", err)
+	}
 
 	hashB64 := fp.B64Encode()
 

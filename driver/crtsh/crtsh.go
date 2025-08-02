@@ -79,6 +79,11 @@ func Driver(maxQueryResults int, timeout time.Duration, savePath string, include
 		return nil, err
 	}
 
+	// Configure connection pool to prevent resource leaks
+	d.db.SetMaxOpenConns(10)
+	d.db.SetMaxIdleConns(2)
+	d.db.SetConnMaxLifetime(time.Hour)
+
 	err = d.setSQLTimeout(d.timeout.Seconds())
 
 	return d, err
@@ -86,6 +91,14 @@ func Driver(maxQueryResults int, timeout time.Duration, savePath string, include
 
 func (d *crtsh) GetName() string {
 	return driverName
+}
+
+// Close closes the database connection
+func (d *crtsh) Close() error {
+	if d.db != nil {
+		return d.db.Close()
+	}
+	return nil
 }
 
 func (d *crtsh) setSQLTimeout(sec float64) error {
@@ -161,6 +174,7 @@ func (d *crtsh) QueryDomain(domain string) (driver.Result, error) {
 	if err != nil {
 		return results, err
 	}
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var hash []byte
@@ -202,6 +216,7 @@ func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error
 	if err != nil {
 		return certNode, err
 	}
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var domain string
@@ -214,7 +229,7 @@ func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error
 
 	if d.save {
 		var rawCert []byte
-		queryStr = `SELECT certificate FORM certificate_and_identities WHERE digest(certificate, 'sha256') = $1;`
+		queryStr = `SELECT certificate FROM certificate_and_identities WHERE digest(certificate, 'sha256') = $1;`
 		row := d.db.QueryRow(queryStr, fp[:])
 		err = row.Scan(&rawCert)
 		if err != nil {

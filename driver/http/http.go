@@ -142,6 +142,9 @@ func (c *httpCertDriver) dialTLS(network, addr string) (net.Conn, error) {
 	connState := conn.ConnectionState()
 
 	// only look at leaf certificate which is valid for domain, rest of cert chain is ignored
+	if len(connState.PeerCertificates) == 0 {
+		return conn, fmt.Errorf("no peer certificates found")
+	}
 	certResult := driver.NewCertResult(connState.PeerCertificates[0])
 	c.certs[certResult.Fingerprint] = certResult
 	host, _, err := net.SplitHostPort(addr)

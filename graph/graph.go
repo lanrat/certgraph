@@ -4,6 +4,7 @@ package graph
 import (
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/lanrat/certgraph/fingerprint"
 )
@@ -12,7 +13,7 @@ import (
 type CertGraph struct {
 	domains    sync.Map
 	certs      sync.Map
-	numDomains int
+	numDomains int64
 	depth      uint
 }
 
@@ -31,7 +32,7 @@ func (graph *CertGraph) AddCert(certNode *CertNode) {
 
 // AddDomain add a DomainNode to the graph
 func (graph *CertGraph) AddDomain(domainNode *DomainNode) {
-	graph.numDomains++
+	atomic.AddInt64(&graph.numDomains, 1)
 	// save the new maximum depth if greather then current
 	if domainNode.Depth > graph.depth {
 		graph.depth = domainNode.Depth
@@ -44,7 +45,7 @@ func (graph *CertGraph) AddDomain(domainNode *DomainNode) {
 
 // NumDomains returns the number of domains in the graph
 func (graph *CertGraph) NumDomains() int {
-	return graph.numDomains
+	return int(atomic.LoadInt64(&graph.numDomains))
 }
 
 // DomainDepth returns the maximum depth of the graph from the initial root domains
