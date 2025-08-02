@@ -129,7 +129,7 @@ func (d *httpDriver) QueryDomain(ctx context.Context, host string) (driver.Resul
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
-	
+
 	resp, err := results.client.Do(req)
 	fullStatus := status.CheckNetErr(err)
 	if fullStatus != status.GOOD {

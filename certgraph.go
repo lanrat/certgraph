@@ -419,29 +419,29 @@ func visit(domainNode *graph.DomainNode) {
 
 	// fingerprints for the domain queried
 	fingerprints := fingerprintMap[domainNode.Domain]
-	
+
 	// Parallelize certificate processing using worker pool
 	type certWork struct {
-		fp fingerprint.Fingerprint
+		fp     fingerprint.Fingerprint
 		result *graph.CertNode
-		err error
+		err    error
 	}
-	
+
 	certChan := make(chan fingerprint.Fingerprint, len(fingerprints))
 	resultChan := make(chan certWork, len(fingerprints))
-	
+
 	// Start worker goroutines
 	numWorkers := min(config.parallel, uint(len(fingerprints)))
 	if numWorkers == 0 {
 		numWorkers = 1
 	}
-	
+
 	for i := uint(0); i < numWorkers; i++ {
 		go func() {
 			for fp := range certChan {
 				var work certWork
 				work.fp = fp
-				
+
 				// Check if we've already attempted to process this certificate
 				processedCertsMutex.Lock()
 				if processedCerts[fp] {
@@ -466,7 +466,7 @@ func visit(domainNode *graph.DomainNode) {
 			}
 		}()
 	}
-	
+
 	// Send work to workers
 	workCount := 0
 	for _, fp := range fingerprints {
@@ -478,7 +478,7 @@ func visit(domainNode *graph.DomainNode) {
 		workCount++
 	}
 	close(certChan)
-	
+
 	// Collect results
 	for i := 0; i < workCount; i++ {
 		work := <-resultChan
@@ -488,12 +488,12 @@ func visit(domainNode *graph.DomainNode) {
 			}
 			continue
 		}
-		
+
 		if work.result != nil {
 			certGraph.AddCert(work.result)
 		}
 	}
-	
+
 	// Add relationships after all certificates are processed
 	for _, fp := range fingerprints {
 		certNode, exists := certGraph.GetCert(fp)

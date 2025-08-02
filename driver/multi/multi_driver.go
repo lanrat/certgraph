@@ -78,12 +78,12 @@ func newResult(host string) *multiResult {
 // multiResult aggregates results from multiple drivers for a single domain query.
 // It provides thread-safe access to merged certificate fingerprints and related data.
 type multiResult struct {
-	host           string                              // The queried domain
-	results        []driver.Result                     // Results from individual drivers
-	resultLock     sync.Mutex                          // Protects results and fingerprints maps
-	fingerprints   driver.FingerprintMap               // Merged fingerprints from all drivers
-	seenFPs        map[fingerprint.Fingerprint]bool    // Tracks fingerprints to prevent duplicates
-	driverStatuses []status.Map                        // Individual driver status reports
+	host           string                           // The queried domain
+	results        []driver.Result                  // Results from individual drivers
+	resultLock     sync.Mutex                       // Protects results and fingerprints maps
+	fingerprints   driver.FingerprintMap            // Merged fingerprints from all drivers
+	seenFPs        map[fingerprint.Fingerprint]bool // Tracks fingerprints to prevent duplicates
+	driverStatuses []status.Map                     // Individual driver status reports
 }
 
 // add merges a driver result into this multiResult instance.
@@ -136,10 +136,10 @@ func (c *multiResult) GetFingerprints() (driver.FingerprintMap, error) {
 func (c *multiResult) GetStatus() status.Map {
 	c.resultLock.Lock()
 	defer c.resultLock.Unlock()
-	
+
 	// Create main multi-driver status
 	multiStatus := status.NewMap(c.host, status.New(status.MULTI))
-	
+
 	// Add individual driver statuses with prefixed keys for identification
 	for i, driverStatus := range c.driverStatuses {
 		for domain, stat := range driverStatus {
@@ -148,7 +148,7 @@ func (c *multiResult) GetStatus() status.Map {
 			multiStatus[key] = stat
 		}
 	}
-	
+
 	return multiStatus
 }
 
