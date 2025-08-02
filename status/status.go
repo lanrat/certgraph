@@ -100,9 +100,10 @@ func CheckNetErr(err error) DomainStatus {
 	} else {
 		switch t := err.(type) {
 		case *net.OpError:
-			if t.Op == "dial" {
+			switch t.Op {
+			case "dial":
 				return NOHOST
-			} else if t.Op == "read" {
+			case "read":
 				return REFUSED
 			}
 		case syscall.Errno:

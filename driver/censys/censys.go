@@ -161,7 +161,7 @@ func (d *censys) jsonRequest(method, url string, request, response interface{}) 
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// got an error, decode it
 	if resp.StatusCode != http.StatusOK {

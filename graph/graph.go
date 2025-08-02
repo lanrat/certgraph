@@ -42,12 +42,12 @@ func (graph *CertGraph) AddDomain(domainNode *DomainNode) {
 	graph.domains.Store(domainNode.Domain, domainNode)
 }
 
-//NumDomains returns the number of domains in the graph
+// NumDomains returns the number of domains in the graph
 func (graph *CertGraph) NumDomains() int {
 	return graph.numDomains
 }
 
-//DomainDepth returns the maximum depth of the graph from the initial root domains
+// DomainDepth returns the maximum depth of the graph from the initial root domains
 func (graph *CertGraph) DomainDepth() uint {
 	return graph.depth
 }

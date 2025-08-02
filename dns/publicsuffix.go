@@ -28,7 +28,7 @@ func UpdatePublicSuffixList(timeout time.Duration) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	newSuffixList := publicsuffix.NewList()
 	_, err = newSuffixList.Load(resp.Body, suffixListParseOptions)
 	suffixList = newSuffixList

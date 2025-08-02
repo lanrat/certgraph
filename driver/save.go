@@ -15,7 +15,7 @@ func CertsToPEMFile(certs []*x509.Certificate, file string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	for _, cert := range certs {
 		err = pem.Encode(f, &pem.Block{Type: "CERTIFICATE", Bytes: cert.Raw})
 		if err != nil {
@@ -34,7 +34,7 @@ func RawCertToPEMFile(cert []byte, file string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	err = pem.Encode(f, &pem.Block{Type: "CERTIFICATE", Bytes: cert})
 	return err
 }

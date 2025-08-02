@@ -25,10 +25,8 @@ import (
 	"github.com/lanrat/certgraph/web"
 )
 
-// version vars
 var (
-	gitDate   = "none"
-	gitHash   = "master"
+	version   = "dev"
 	certGraph = graph.NewCertGraph()
 )
 
@@ -101,7 +99,7 @@ func main() {
 
 	// check for version flag
 	if config.printVersion {
-		fmt.Println(version())
+		fmt.Println(showVersion())
 		return
 	}
 
@@ -411,15 +409,15 @@ func visit(domainNode *graph.DomainNode) {
 
 func printNode(domainNode *graph.DomainNode) {
 	if config.details {
-		fmt.Fprintln(os.Stdout, domainNode)
+		_, _ = fmt.Fprintln(os.Stdout, domainNode)
 	} else {
-		fmt.Fprintln(os.Stdout, domainNode.Domain)
+		_, _ = fmt.Fprintln(os.Stdout, domainNode.Domain)
 	}
 	if config.checkDNS && !domainNode.HasDNS {
 		// TODO print this in a better way
 		// TODO for debugging
 		realDomain, _ := dns.ApexDomain(domainNode.Domain)
-		fmt.Fprintf(os.Stdout, "* Missing DNS for: %s\n", realDomain)
+		_, _ = fmt.Fprintf(os.Stdout, "* Missing DNS for: %s\n", realDomain)
 
 	}
 }
@@ -437,7 +435,7 @@ func certNodeFromCertResult(certResult *driver.CertResult) *graph.CertNode {
 // TODO map all config json
 func generateGraphMetadata() map[string]interface{} {
 	data := make(map[string]interface{})
-	data["version"] = version()
+	data["version"] = version
 	data["website"] = "https://lanrat.github.io/certgraph/"
 	data["scan_date"] = time.Now().UTC()
 	data["command"] = strings.Join(os.Args, " ")
@@ -455,8 +453,8 @@ func generateGraphMetadata() map[string]interface{} {
 }
 
 // returns the version string
-func version() string {
-	return fmt.Sprintf("Git commit: %s [%s]", gitDate, gitHash)
+func showVersion() string {
+	return fmt.Sprintf("Version: %s", version)
 }
 
 // cleanInput attempts to parse the input string as a url to extract the hostname

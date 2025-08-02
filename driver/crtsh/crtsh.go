@@ -5,7 +5,6 @@
 // As the API is unofficial and has been reverse engineered it may stop working
 // at any time and comes with no guarantees.
 // view SQL excample: https://crt.sh/?showSQL=Y&exclude=expired&q=
-//
 package crtsh
 
 import (

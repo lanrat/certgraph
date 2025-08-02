@@ -108,7 +108,7 @@ func (d *httpDriver) QueryDomain(host string) (driver.Result, error) {
 	if fullStatus != status.GOOD {
 		return results, err // in some rare cases this error can be ignored
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// set final domain status
 	results.status.Set(resp.Request.URL.Hostname(), status.New(status.GOOD))

@@ -88,7 +88,7 @@ func (d *smtpDriver) smtpGetCerts(host string) ([]*x509.Certificate, error) {
 	if err != nil {
 		return certs, err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	smtp, err := smtp.NewClient(conn, host)
 	if err != nil {
 		return certs, err
