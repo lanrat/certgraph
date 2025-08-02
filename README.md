@@ -70,7 +70,6 @@ CertGraph has multiple options for querying SSL certificates. The driver is resp
 
 * **crtsh** this driver searches Certificate Transparency logs via [crt.sh](https://crt.sh/). No packets are sent to any of the domains when using this driver
 
-
 ## Example
 
 ```console
@@ -94,25 +93,28 @@ Pre-compiled releases are automatically built and uploaded to the [releases GitH
 
 This project uses GitHub Actions for continuous integration and deployment:
 
-- **Tests and Linting**: Automatically runs tests and linting on every push and pull request
-- **Docker Images**: Automatically builds and pushes Docker images to GitHub Container Registry on version tags
-- **Releases**: Automatically creates releases with pre-compiled binaries for multiple platforms using GoReleaser
+* **Tests and Linting**: Automatically runs tests and linting on every push and pull request
+* **Docker Images**: Automatically builds and pushes Docker images to GitHub Container Registry on version tags
+* **Releases**: Automatically creates releases with pre-compiled binaries for multiple platforms using GoReleaser
 
 ### Docker
 
 CertGraph is available as Docker images on both Docker Hub and GitHub Container Registry:
 
 **Docker Hub:**
+
 ```console
-$ docker run --rm -it lanrat/certgraph example.com
+docker run --rm -it lanrat/certgraph example.com
 ```
 
 **GitHub Container Registry:**
+
 ```console
-$ docker run --rm -it ghcr.io/lanrat/certgraph example.com
+docker run --rm -it ghcr.io/lanrat/certgraph example.com
 ```
 
 **Example output:**
+
 ```console
 example.com
 www.example.net

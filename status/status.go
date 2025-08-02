@@ -24,7 +24,7 @@ func New(domainStatus DomainStatus) Status {
 	}
 }
 
-// NewMeta returns a new Status with the provied meta
+// NewMeta returns a new Status with the proxied meta
 func NewMeta(domainStatus DomainStatus, meta string) Status {
 	s := New(domainStatus)
 	s.Meta = meta

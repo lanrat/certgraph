@@ -17,6 +17,7 @@
         "GOPROXY",
         "goreleaser",
         "ldflags",
+        "NOHOST",
         "serv",
         "trimpath"
     ],
