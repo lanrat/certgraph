@@ -35,7 +35,7 @@ OPTIONS:
   -dns
      check for DNS records to determine if domain is registered
   -driver string
-     driver(s) to use [censys, crtsh, http, smtp] (default "http")
+     driver(s) to use [crtsh, smtp, censys, http] (default "http")
   -json
      print the graph as json, can be used for graph in web UI
   -parallel uint
@@ -88,14 +88,32 @@ The above output represents the adjacency list for the graph for the root domain
 
 ## [Releases](https://github.com/lanrat/certgraph/releases)
 
-Pre-compiled releases will occasionally be uploaded to the [releases github page](https://github.com/lanrat/certgraph/releases). [https://github.com/lanrat/certgraph/releases](https://github.com/lanrat/certgraph/releases)
+Pre-compiled releases are automatically built and uploaded to the [releases GitHub page](https://github.com/lanrat/certgraph/releases) using GitHub Actions. Releases are available for multiple platforms including Linux, macOS, and Windows.
 
-### [Docker](https://hub.docker.com/r/lanrat/certgraph/)
+## CI/CD
 
-CertGraph is an automated build on the Docker Hub!
+This project uses GitHub Actions for continuous integration and deployment:
 
+- **Tests and Linting**: Automatically runs tests and linting on every push and pull request
+- **Docker Images**: Automatically builds and pushes Docker images to GitHub Container Registry on version tags
+- **Releases**: Automatically creates releases with pre-compiled binaries for multiple platforms using GoReleaser
+
+### Docker
+
+CertGraph is available as Docker images on both Docker Hub and GitHub Container Registry:
+
+**Docker Hub:**
 ```console
 $ docker run --rm -it lanrat/certgraph example.com
+```
+
+**GitHub Container Registry:**
+```console
+$ docker run --rm -it ghcr.io/lanrat/certgraph example.com
+```
+
+**Example output:**
+```console
 example.com
 www.example.net
 www.example.org
@@ -113,7 +131,7 @@ www.example.edu
 
 ## Compiling
 
-To compile certgraph you must have a working go 1.16 or newer compiler on your system.
+To compile certgraph you must have a working Go 1.23 or newer compiler on your system.
 To compile for the running system compilation is as easy as running make
 
 ```console
@@ -121,10 +139,28 @@ certgraph$ make
 go build -o certgraph certgraph.go
 ```
 
-Alternatively you can use `go get` to install with this one-liner:
+Alternatively you can use `go install` to install with this one-liner:
 
 ```console
 go install github.com/lanrat/certgraph@latest
+```
+
+### Development
+
+For development, you can build and test the project using the provided Makefile:
+
+```console
+# Build the binary
+make
+
+# Run tests
+make test
+
+# Run linting
+make lint
+
+# Build Docker image locally
+make docker
 ```
 
 ## [Web UI](https://lanrat.github.io/certgraph/)
