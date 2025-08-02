@@ -2,6 +2,7 @@
 package driver
 
 import (
+	"context"
 	"crypto/x509"
 	"sort"
 	"strings"
@@ -9,8 +10,6 @@ import (
 	"github.com/lanrat/certgraph/fingerprint"
 	"github.com/lanrat/certgraph/status"
 )
-
-// TODO add context instead of timeout on all requests
 
 // Drivers contains all the drivers that have been registered
 var Drivers []string
@@ -27,7 +26,7 @@ type Driver interface {
 	// QueryDomain is the main entrypoint for Driver Searching
 	// The domain provided will return a CertDriver instance which can be used to query the
 	// certificates for the provided domain using the driver
-	QueryDomain(domain string) (Result, error)
+	QueryDomain(ctx context.Context, domain string) (Result, error)
 
 	// GetName returns the name of the driver
 	GetName() string
@@ -46,7 +45,7 @@ type Result interface {
 	GetFingerprints() (FingerprintMap, error)
 
 	// QueryCert returns the details of the provided certificate or an error if not found
-	QueryCert(fp fingerprint.Fingerprint) (*CertResult, error)
+	QueryCert(ctx context.Context, fp fingerprint.Fingerprint) (*CertResult, error)
 }
 
 // FingerprintMap stores a mapping of domains to Fingerprints returned from the driver

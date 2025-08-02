@@ -2,6 +2,7 @@
 package multi
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -39,14 +40,14 @@ func (d *multiDriver) GetName() string {
 
 // QueryDomain executes domain queries against all drivers concurrently.
 // Returns a merged result containing certificates and status information from all drivers.
-func (d *multiDriver) QueryDomain(domain string) (driver.Result, error) {
+func (d *multiDriver) QueryDomain(ctx context.Context, domain string) (driver.Result, error) {
 	r := newResult(domain)
-	var group errgroup.Group
+	group, ctx := errgroup.WithContext(ctx)
 	for _, d := range d.drivers {
 		goFunc := func(localDriver driver.Driver) func() error {
 			return func() error {
 				return func(localDriver driver.Driver) error {
-					result, err := localDriver.QueryDomain(domain)
+					result, err := localDriver.QueryDomain(ctx, domain)
 					if err != nil {
 						return err
 					}
@@ -104,9 +105,9 @@ func (c *multiResult) add(r driver.Result) error {
 
 // QueryCert attempts to retrieve certificate details from any of the drivers.
 // Returns the first successful result found among the combined drivers.
-func (c *multiResult) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error) {
+func (c *multiResult) QueryCert(ctx context.Context, fp fingerprint.Fingerprint) (*driver.CertResult, error) {
 	for _, result := range c.results {
-		cr, err := result.QueryCert(fp)
+		cr, err := result.QueryCert(ctx, fp)
 		if err != nil {
 			return nil, err
 		}

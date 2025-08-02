@@ -11,6 +11,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"flag"
@@ -389,7 +390,9 @@ func visit(domainNode *graph.DomainNode) {
 
 	// perform cert search
 	// TODO do pagination in multiple threads to not block on long searches
-	results, err := certDriver.QueryDomain(domainNode.Domain)
+	ctx, cancel := context.WithTimeout(context.Background(), config.timeout)
+	defer cancel()
+	results, err := certDriver.QueryDomain(ctx, domainNode.Domain)
 	if err != nil {
 		// this is VERY common to error, usually this is a DNS or tcp connection related issue
 		// we will skip the domain if we can't query it
@@ -430,7 +433,7 @@ func visit(domainNode *graph.DomainNode) {
 			processedCerts[fp] = true
 
 			// get cert details
-			certResult, err := results.QueryCert(fp)
+			certResult, err := results.QueryCert(ctx, fp)
 			if err != nil {
 				v("QueryCert", err)
 				continue

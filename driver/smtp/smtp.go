@@ -60,7 +60,7 @@ func (c *smtpCertDriver) GetRelated() ([]string, error) {
 
 // QueryCert retrieves certificate details for a specific fingerprint.
 // Returns an error if the certificate was not found in this SMTP query.
-func (c *smtpCertDriver) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error) {
+func (c *smtpCertDriver) QueryCert(ctx context.Context, fp fingerprint.Fingerprint) (*driver.CertResult, error) {
 	cert, found := c.certs[fp]
 	if found {
 		return cert, nil
@@ -119,7 +119,7 @@ func (d *smtpDriver) smtpGetCerts(host string) ([]*x509.Certificate, error) {
 
 // QueryDomain discovers certificates for a domain through SMTP STARTTLS.
 // Also performs MX record lookups to find related mail server domains.
-func (d *smtpDriver) QueryDomain(host string) (driver.Result, error) {
+func (d *smtpDriver) QueryDomain(ctx context.Context, host string) (driver.Result, error) {
 	results := &smtpCertDriver{
 		host:         host,
 		status:       make(status.Map),

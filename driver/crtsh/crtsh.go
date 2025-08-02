@@ -8,6 +8,7 @@
 package crtsh
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -57,8 +58,8 @@ func (c *crtshCertDriver) GetRelated() ([]string, error) {
 	return nil, nil // Return nil instead of empty slice for better memory efficiency
 }
 
-func (c *crtshCertDriver) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error) {
-	return c.driver.QueryCert(fp)
+func (c *crtshCertDriver) QueryCert(ctx context.Context, fp fingerprint.Fingerprint) (*driver.CertResult, error) {
+	return c.driver.QueryCert(ctx, fp)
 }
 
 // Driver creates a new CT driver for crt.sh
@@ -108,7 +109,7 @@ func (d *crtsh) setSQLTimeout(sec float64) error {
 	return err
 }
 
-func (d *crtsh) QueryDomain(domain string) (driver.Result, error) {
+func (d *crtsh) QueryDomain(ctx context.Context, domain string) (driver.Result, error) {
 	results := &crtshCertDriver{
 		host:         domain,
 		fingerprints: make(driver.FingerprintMap),
@@ -164,7 +165,7 @@ func (d *crtsh) QueryDomain(domain string) (driver.Result, error) {
 		if debug {
 			log.Printf("QueryDomain try %d: %s", try, queryStr)
 		}
-		rows, err = d.db.Query(queryStr, d.includeExpired, d.includeSubdomains, d.queryLimit, domain)
+		rows, err = d.db.QueryContext(ctx, queryStr, d.includeExpired, d.includeSubdomains, d.queryLimit, domain)
 		if err == nil {
 			break
 		}
@@ -202,7 +203,7 @@ func (d *crtsh) QueryDomain(domain string) (driver.Result, error) {
 	return results, nil
 }
 
-func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error) {
+func (d *crtsh) QueryCert(ctx context.Context, fp fingerprint.Fingerprint) (*driver.CertResult, error) {
 	certNode := new(driver.CertResult)
 	certNode.Fingerprint = fp
 	certNode.Domains = make([]string, 0, 5)
@@ -217,7 +218,7 @@ func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error
 	for try < 5 {
 		// this is a hack while crt.sh gets there stuff together
 		try++
-		rows, err = d.db.Query(queryStr, fp[:])
+		rows, err = d.db.QueryContext(ctx, queryStr, fp[:])
 		if err == nil {
 			break
 		}

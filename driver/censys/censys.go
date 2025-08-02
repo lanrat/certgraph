@@ -7,6 +7,7 @@ package censys
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
@@ -66,8 +67,8 @@ func (c *censysCertDriver) GetRelated() ([]string, error) {
 	return nil, nil // Return nil instead of empty slice for better memory efficiency
 }
 
-func (c *censysCertDriver) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error) {
-	return c.driver.QueryCert(fp)
+func (c *censysCertDriver) QueryCert(ctx context.Context, fp fingerprint.Fingerprint) (*driver.CertResult, error) {
+	return c.driver.QueryCert(ctx, fp)
 }
 
 // TODO support pagination
@@ -188,7 +189,7 @@ func (d *censys) jsonRequest(method, url string, request, response interface{}) 
 	return nil
 }
 
-func (d *censys) QueryDomain(domain string) (driver.Result, error) {
+func (d *censys) QueryDomain(ctx context.Context, domain string) (driver.Result, error) {
 	results := &censysCertDriver{
 		host:         domain,
 		fingerprints: make(driver.FingerprintMap),
@@ -218,7 +219,7 @@ func (d *censys) QueryDomain(domain string) (driver.Result, error) {
 	return results, nil
 }
 
-func (d *censys) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error) {
+func (d *censys) QueryCert(ctx context.Context, fp fingerprint.Fingerprint) (*driver.CertResult, error) {
 	certNode := new(driver.CertResult)
 	certNode.Fingerprint = fp
 	certNode.Domains = make([]string, 0, 5)

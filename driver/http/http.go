@@ -2,6 +2,7 @@
 package http
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"net"
@@ -58,7 +59,7 @@ func (c *httpCertDriver) GetRelated() ([]string, error) {
 
 // QueryCert retrieves certificate details for a specific fingerprint.
 // Returns an error if the certificate was not found in this HTTP query.
-func (c *httpCertDriver) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error) {
+func (c *httpCertDriver) QueryCert(ctx context.Context, fp fingerprint.Fingerprint) (*driver.CertResult, error) {
 	cert, found := c.certs[fp]
 	if found {
 		return cert, nil
@@ -121,10 +122,15 @@ func (d *httpDriver) newHTTPCertDriver() *httpCertDriver {
 
 // QueryDomain discovers certificates for a domain through HTTPS connections.
 // Follows redirects and collects certificates from all encountered servers.
-func (d *httpDriver) QueryDomain(host string) (driver.Result, error) {
+func (d *httpDriver) QueryDomain(ctx context.Context, host string) (driver.Result, error) {
 	results := d.newHTTPCertDriver()
 
-	resp, err := results.client.Get(fmt.Sprintf("https://%s", host))
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://%s", host), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	
+	resp, err := results.client.Do(req)
 	fullStatus := status.CheckNetErr(err)
 	if fullStatus != status.GOOD {
 		return results, err // in some rare cases this error can be ignored
