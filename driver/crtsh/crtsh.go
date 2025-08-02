@@ -4,7 +4,7 @@
 //
 // As the API is unofficial and has been reverse engineered it may stop working
 // at any time and comes with no guarantees.
-// view SQL excample: https://crt.sh/?showSQL=Y&exclude=expired&q=
+// view SQL example: https://crt.sh/?showSQL=Y&exclude=expired&q=
 package crtsh
 
 import (
@@ -17,7 +17,7 @@ import (
 	"github.com/lanrat/certgraph/driver"
 	"github.com/lanrat/certgraph/fingerprint"
 	"github.com/lanrat/certgraph/status"
-	_ "github.com/lib/pq" // portgresql
+	_ "github.com/lib/pq"
 )
 
 const connStr = "postgresql://guest@crt.sh/certwatch?sslmode=disable&fallback_application_name=certgraph&binary_parameters=yes"
@@ -159,7 +159,7 @@ func (d *crtsh) QueryDomain(domain string) (driver.Result, error) {
 	baseDelay := 100 * time.Millisecond
 
 	for try < 5 {
-		// this is a hack while crt.sh gets there stuff togeather
+		// this is a hack while crt.sh gets there stuff together
 		try++
 		if debug {
 			log.Printf("QueryDomain try %d: %s", try, queryStr)

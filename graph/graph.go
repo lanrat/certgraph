@@ -34,7 +34,7 @@ func (graph *CertGraph) AddCert(certNode *CertNode) {
 // AddDomain add a DomainNode to the graph
 func (graph *CertGraph) AddDomain(domainNode *DomainNode) {
 	atomic.AddInt64(&graph.numDomains, 1)
-	// save the new maximum depth if greather then current
+	// save the new maximum depth if greater then current
 	if domainNode.Depth > graph.depth {
 		graph.depth = domainNode.Depth
 	}
