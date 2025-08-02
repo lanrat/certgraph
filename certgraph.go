@@ -21,13 +21,15 @@ import (
 	"github.com/lanrat/certgraph/driver/http"
 	"github.com/lanrat/certgraph/driver/multi"
 	"github.com/lanrat/certgraph/driver/smtp"
+	"github.com/lanrat/certgraph/fingerprint"
 	"github.com/lanrat/certgraph/graph"
 	"github.com/lanrat/certgraph/web"
 )
 
 var (
-	version   = "dev"
-	certGraph = graph.NewCertGraph()
+	version        = "dev"
+	certGraph      = graph.NewCertGraph()
+	processedCerts = make(map[fingerprint.Fingerprint]bool) // Session-wide cache for processed certificates
 )
 
 // temp flag vars
@@ -249,8 +251,13 @@ func printJSONGraph() {
 // breathFirstSearch perform Breadth first search to build the graph
 func breathFirstSearch(roots []string) {
 	var wg sync.WaitGroup
-	domainNodeInputChan := make(chan *graph.DomainNode, 5)  // input queue
-	domainNodeOutputChan := make(chan *graph.DomainNode, 5) // output queue
+	// Dynamic buffer sizing based on parallelism and expected workload
+	bufferSize := int(config.parallel) * 2
+	if bufferSize < 10 {
+		bufferSize = 10 // Minimum buffer size
+	}
+	domainNodeInputChan := make(chan *graph.DomainNode, bufferSize)
+	domainNodeOutputChan := make(chan *graph.DomainNode, bufferSize)
 
 	// thread limit code
 	threadPass := make(chan bool, config.parallel)
@@ -388,6 +395,15 @@ func visit(domainNode *graph.DomainNode) {
 		// add certNode to graph
 		certNode, exists := certGraph.GetCert(fp)
 		if !exists {
+			// Check if we've already attempted to process this certificate
+			if processedCerts[fp] {
+				v("Certificate processing already attempted, skipping:", fp.HexString())
+				continue
+			}
+
+			// Mark as being processed to avoid duplicate attempts
+			processedCerts[fp] = true
+
 			// get cert details
 			certResult, err := results.QueryCert(fp)
 			if err != nil {

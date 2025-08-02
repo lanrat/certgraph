@@ -99,13 +99,7 @@ This project uses GitHub Actions for continuous integration and deployment:
 
 ### Docker
 
-CertGraph is available as Docker images on both Docker Hub and GitHub Container Registry:
-
-**Docker Hub:**
-
-```console
-docker run --rm -it lanrat/certgraph example.com
-```
+CertGraph is available as Docker image on the GitHub Container Registry
 
 **GitHub Container Registry:**
 

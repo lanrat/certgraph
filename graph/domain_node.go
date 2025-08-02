@@ -78,14 +78,17 @@ func (d *DomainNode) GetCertificates() []fingerprint.Fingerprint {
 
 // String returns the string representation of a node
 func (d *DomainNode) String() string {
-	certString := ""
+	var certBuilder strings.Builder
 	// Certs
 	if len(d.Certs) > 0 {
 		for fingerprint := range d.Certs {
-			certString = fmt.Sprintf("%s %s", certString, fingerprint.HexString())
+			if certBuilder.Len() > 0 {
+				certBuilder.WriteByte(' ')
+			}
+			certBuilder.WriteString(fingerprint.HexString())
 		}
 	}
-	return fmt.Sprintf("%s\t%d\t%s\t%s", d.Domain, d.Depth, d.Status.String(), certString)
+	return fmt.Sprintf("%s\t%d\t%s\t%s", d.Domain, d.Depth, d.Status.String(), certBuilder.String())
 }
 
 // AddCertFingerprint appends a Fingerprint to the DomainNode's list of certificates

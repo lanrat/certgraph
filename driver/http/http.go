@@ -89,12 +89,19 @@ func (d *httpDriver) newHTTPCertDriver() *httpCertDriver {
 		Timeout:       d.timeout,
 		CheckRedirect: result.checkRedirect,
 	}
+	// Create transport with connection pooling optimizations
 	result.client.Transport = &http.Transport{
 		TLSClientConfig:       d.tlsConfig,
 		TLSHandshakeTimeout:   d.timeout,
 		ResponseHeaderTimeout: d.timeout,
 		ExpectContinueTimeout: d.timeout,
 		DialTLS:               result.dialTLS,
+		// Connection pooling settings for better performance
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 10,
+		MaxConnsPerHost:     10,
+		IdleConnTimeout:     90 * time.Second,
+		ForceAttemptHTTP2:   true,
 	}
 	return result
 }

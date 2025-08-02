@@ -54,7 +54,7 @@ func (c *crtshCertDriver) GetStatus() status.Map {
 }
 
 func (c *crtshCertDriver) GetRelated() ([]string, error) {
-	return make([]string, 0), nil
+	return nil, nil // Return nil instead of empty slice for better memory efficiency
 }
 
 func (c *crtshCertDriver) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error) {
@@ -79,10 +79,12 @@ func Driver(maxQueryResults int, timeout time.Duration, savePath string, include
 		return nil, err
 	}
 
-	// Configure connection pool to prevent resource leaks
-	d.db.SetMaxOpenConns(10)
-	d.db.SetMaxIdleConns(2)
-	d.db.SetConnMaxLifetime(time.Hour)
+	// Configure connection pool to prevent resource leaks and optimize for concurrent usage
+	// Scale connections based on expected load patterns
+	d.db.SetMaxOpenConns(25)                  // Increased for better concurrency
+	d.db.SetMaxIdleConns(5)                   // More idle connections for faster reconnection
+	d.db.SetConnMaxLifetime(30 * time.Minute) // Shorter lifetime for better connection health
+	d.db.SetConnMaxIdleTime(5 * time.Minute)  // Close idle connections sooner
 
 	err = d.setSQLTimeout(d.timeout.Seconds())
 
@@ -154,6 +156,8 @@ func (d *crtsh) QueryDomain(domain string) (driver.Result, error) {
 	try := 0
 	var err error
 	var rows *sql.Rows
+	baseDelay := 100 * time.Millisecond
+
 	for try < 5 {
 		// this is a hack while crt.sh gets there stuff togeather
 		try++
@@ -166,6 +170,12 @@ func (d *crtsh) QueryDomain(domain string) (driver.Result, error) {
 		}
 		if debug {
 			log.Printf("crtsh pq error on domain %q: %s", domain, err.Error())
+		}
+
+		// Exponential backoff before retry (except on last attempt)
+		if try < 5 {
+			delay := baseDelay * time.Duration(1<<(try-1)) // 100ms, 200ms, 400ms, 800ms
+			time.Sleep(delay)
 		}
 	}
 	/*if try > 1 {
@@ -202,12 +212,20 @@ func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error
 	try := 0
 	var err error
 	var rows *sql.Rows
+	baseDelay := 100 * time.Millisecond
+
 	for try < 5 {
 		// this is a hack while crt.sh gets there stuff togeather
 		try++
 		rows, err = d.db.Query(queryStr, fp[:])
 		if err == nil {
 			break
+		}
+
+		// Exponential backoff before retry (except on last attempt)
+		if try < 5 {
+			delay := baseDelay * time.Duration(1<<(try-1)) // 100ms, 200ms, 400ms, 800ms
+			time.Sleep(delay)
 		}
 	}
 	/*if try > 1 {

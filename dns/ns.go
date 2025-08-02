@@ -8,8 +8,49 @@ import (
 	"time"
 )
 
+// dnsCacheEntry represents a cached DNS result with expiration
+type dnsCacheEntry struct {
+	result    bool
+	expiredAt time.Time
+}
+
+// dnsCacheWithTTL implements a TTL-based cache for DNS results
+type dnsCacheWithTTL struct {
+	cache sync.Map
+	ttl   time.Duration
+}
+
+// newDNSCache creates a new DNS cache with the specified TTL
+func newDNSCache(ttl time.Duration) *dnsCacheWithTTL {
+	return &dnsCacheWithTTL{
+		ttl: ttl,
+	}
+}
+
+// get retrieves a value from the cache if it exists and hasn't expired
+func (c *dnsCacheWithTTL) get(key string) (bool, bool) {
+	if entry, found := c.cache.Load(key); found {
+		cacheEntry := entry.(dnsCacheEntry)
+		if time.Now().Before(cacheEntry.expiredAt) {
+			return cacheEntry.result, true
+		}
+		// Entry expired, remove it
+		c.cache.Delete(key)
+	}
+	return false, false
+}
+
+// set stores a value in the cache with TTL
+func (c *dnsCacheWithTTL) set(key string, value bool) {
+	entry := dnsCacheEntry{
+		result:    value,
+		expiredAt: time.Now().Add(c.ttl),
+	}
+	c.cache.Store(key, entry)
+}
+
 var (
-	dnsCache    = &sync.Map{}
+	dnsCache    = newDNSCache(5 * time.Minute) // 5 minute TTL
 	dnsResolver = &net.Resolver{}
 )
 
@@ -77,12 +118,12 @@ func HasRecordsCache(domain string, timeout time.Duration) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if cached, found := dnsCache.Load(domain); found {
-		return cached.(bool), nil
+	if cached, found := dnsCache.get(domain); found {
+		return cached, nil
 	}
 	hasRecords, err := HasRecords(domain, timeout)
 	if err == nil {
-		dnsCache.Store(domain, hasRecords)
+		dnsCache.set(domain, hasRecords)
 	}
 	return hasRecords, err
 }

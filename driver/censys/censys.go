@@ -63,7 +63,7 @@ func (c *censysCertDriver) GetStatus() status.Map {
 }
 
 func (c *censysCertDriver) GetRelated() ([]string, error) {
-	return make([]string, 0), nil
+	return nil, nil // Return nil instead of empty slice for better memory efficiency
 }
 
 func (c *censysCertDriver) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error) {
