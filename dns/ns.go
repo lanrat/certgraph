@@ -8,26 +8,28 @@ import (
 	"time"
 )
 
-// dnsCacheEntry represents a cached DNS result with expiration
+// dnsCacheEntry represents a cached DNS lookup result with TTL expiration.
 type dnsCacheEntry struct {
-	result    bool
-	expiredAt time.Time
+	result    bool      // Whether DNS records were found
+	expiredAt time.Time // When this cache entry expires
 }
 
-// dnsCacheWithTTL implements a TTL-based cache for DNS results
+// dnsCacheWithTTL implements a thread-safe TTL-based cache for DNS lookup results.
+// Automatically expires entries after the specified TTL duration.
 type dnsCacheWithTTL struct {
-	cache sync.Map
-	ttl   time.Duration
+	cache sync.Map      // Thread-safe map for storing cache entries
+	ttl   time.Duration // Time-to-live for cache entries
 }
 
-// newDNSCache creates a new DNS cache with the specified TTL
+// newDNSCache creates a new DNS cache instance with the specified TTL.
 func newDNSCache(ttl time.Duration) *dnsCacheWithTTL {
 	return &dnsCacheWithTTL{
 		ttl: ttl,
 	}
 }
 
-// get retrieves a value from the cache if it exists and hasn't expired
+// get retrieves a cached DNS result if it exists and hasn't expired.
+// Returns (result, found) where found indicates if a valid cache entry was found.
 func (c *dnsCacheWithTTL) get(key string) (bool, bool) {
 	if entry, found := c.cache.Load(key); found {
 		cacheEntry := entry.(dnsCacheEntry)
@@ -40,7 +42,7 @@ func (c *dnsCacheWithTTL) get(key string) (bool, bool) {
 	return false, false
 }
 
-// set stores a value in the cache with TTL
+// set stores a DNS lookup result in the cache with automatic expiration.
 func (c *dnsCacheWithTTL) set(key string, value bool) {
 	entry := dnsCacheEntry{
 		result:    value,
@@ -59,6 +61,8 @@ func init() {
 	dnsResolver.StrictErrors = false
 }
 
+// noSuchHostDNSError checks if an error is a "no such host" DNS error.
+// Used to distinguish between network errors and legitimate "no records" responses.
 func noSuchHostDNSError(err error) bool {
 	dnsErr, ok := err.(*net.DNSError)
 	if !ok {
@@ -68,8 +72,9 @@ func noSuchHostDNSError(err error) bool {
 	return dnsErr.Err == "no such host"
 }
 
-// HasRecords does NS, CNAME, A, and AAAA lookups with a timeout
-// returns error when no NS found, does not use alexDomain
+// HasRecords performs comprehensive DNS lookups (NS, CNAME, A, AAAA) to determine if a domain exists.
+// Returns true if any DNS records are found, false if no records exist.
+// Uses the provided timeout for all DNS queries.
 func HasRecords(domain string, timeout time.Duration) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -111,8 +116,9 @@ func HasRecords(domain string, timeout time.Duration) (bool, error) {
 	return false, nil
 }
 
-// HasRecordsCache returns true if the domain has no DNS records (at the apex domain level)
-// uses a cache to store results to prevent lots of DNS lookups
+// HasRecordsCache performs cached DNS record lookups for a domain's apex.
+// Automatically converts subdomains to their apex domain before lookup.
+// Uses caching to avoid repeated DNS queries for the same apex domain.
 func HasRecordsCache(domain string, timeout time.Duration) (bool, error) {
 	domain, err := ApexDomain(domain)
 	if err != nil {

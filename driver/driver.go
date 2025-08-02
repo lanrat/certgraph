@@ -15,7 +15,9 @@ import (
 // Drivers contains all the drivers that have been registered
 var Drivers []string
 
-// AddDriver should be called in the init() function of every driver to register them here
+// AddDriver registers a driver name in the global driver registry.
+// This should be called in the init() function of every driver implementation
+// to make it available for use.
 func AddDriver(name string) {
 	Drivers = append(Drivers, name)
 }
@@ -53,7 +55,8 @@ type Result interface {
 // the fingerprints returned are guaranteed to be a complete result for the domain's certs, but related domains may or may not be complete
 type FingerprintMap map[string][]fingerprint.Fingerprint
 
-// Add adds a domain and fingerprint to the map
+// Add appends a certificate fingerprint to the list associated with a domain.
+// If the domain doesn't exist in the map, it creates a new entry.
 func (f FingerprintMap) Add(domain string, fp fingerprint.Fingerprint) {
 	f[domain] = append(f[domain], fp)
 }

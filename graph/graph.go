@@ -17,7 +17,8 @@ type CertGraph struct {
 	depth      uint
 }
 
-// NewCertGraph instantiates a new empty CertGraph
+// NewCertGraph creates and returns a new empty certificate graph.
+// The graph uses concurrent-safe maps for storing domains and certificates.
 func NewCertGraph() *CertGraph {
 	graph := new(CertGraph)
 	return graph

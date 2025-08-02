@@ -23,34 +23,43 @@ func init() {
 	driver.AddDriver(driverName)
 }
 
+// smtpDriver implements certificate discovery through SMTP STARTTLS connections.
+// It connects to mail servers and retrieves their SSL certificates.
 type smtpDriver struct {
-	port      string
-	save      bool
-	savePath  string
-	tlsConfig *tls.Config
-	timeout   time.Duration
+	port      string        // SMTP port (default: 25)
+	save      bool          // Whether to save certificates to disk
+	savePath  string        // Directory path for saving certificates
+	tlsConfig *tls.Config   // TLS configuration for STARTTLS
+	timeout   time.Duration // Connection timeout
 }
 
+// smtpCertDriver represents the result of an SMTP certificate query.
+// It stores certificates discovered through STARTTLS and related MX record information.
 type smtpCertDriver struct {
-	host         string
-	fingerprints driver.FingerprintMap
-	status       status.Map
-	mx           []string
-	certs        map[fingerprint.Fingerprint]*driver.CertResult
+	host         string                                         // The queried domain
+	fingerprints driver.FingerprintMap                          // Certificate fingerprints found
+	status       status.Map                                     // Connection status for the domain
+	mx           []string                                       // MX records for the domain
+	certs        map[fingerprint.Fingerprint]*driver.CertResult // Certificate details
 }
 
+// GetFingerprints returns the certificate fingerprints discovered through SMTP.
 func (c *smtpCertDriver) GetFingerprints() (driver.FingerprintMap, error) {
 	return c.fingerprints, nil
 }
 
+// GetStatus returns the connection status for the SMTP query.
 func (c *smtpCertDriver) GetStatus() status.Map {
 	return c.status
 }
 
+// GetRelated returns MX record hostnames as related domains for further exploration.
 func (c *smtpCertDriver) GetRelated() ([]string, error) {
 	return c.mx, nil
 }
 
+// QueryCert retrieves certificate details for a specific fingerprint.
+// Returns an error if the certificate was not found in this SMTP query.
 func (c *smtpCertDriver) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error) {
 	cert, found := c.certs[fp]
 	if found {
@@ -59,7 +68,8 @@ func (c *smtpCertDriver) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResu
 	return nil, fmt.Errorf("certificate with Fingerprint %s not found", fp.HexString())
 }
 
-// Driver creates a new SSL driver for SMTP Connections
+// Driver creates a new SMTP certificate discovery driver.
+// Uses STARTTLS to establish TLS connections and retrieve certificates from mail servers.
 func Driver(timeout time.Duration, savePath string) (driver.Driver, error) {
 	d := new(smtpDriver)
 	d.port = "25"
@@ -75,10 +85,13 @@ func Driver(timeout time.Duration, savePath string) (driver.Driver, error) {
 	return d, nil
 }
 
+// GetName returns the driver name for identification.
 func (d *smtpDriver) GetName() string {
 	return driverName
 }
 
+// smtpGetCerts establishes an SMTP connection and retrieves certificates via STARTTLS.
+// Returns the certificate chain presented by the mail server.
 func (d *smtpDriver) smtpGetCerts(host string) ([]*x509.Certificate, error) {
 	var certs []*x509.Certificate
 	addr := net.JoinHostPort(host, d.port)
@@ -104,7 +117,8 @@ func (d *smtpDriver) smtpGetCerts(host string) ([]*x509.Certificate, error) {
 	return connState.PeerCertificates, err
 }
 
-// QueryDomain gets the certificates found for a given domain
+// QueryDomain discovers certificates for a domain through SMTP STARTTLS.
+// Also performs MX record lookups to find related mail server domains.
 func (d *smtpDriver) QueryDomain(host string) (driver.Result, error) {
 	results := &smtpCertDriver{
 		host:         host,
@@ -144,7 +158,8 @@ func (d *smtpDriver) QueryDomain(host string) (driver.Result, error) {
 	return results, err
 }
 
-// getMX returns the MX records for the provided domain
+// getMX performs DNS MX record lookup for the domain.
+// Returns a list of mail server hostnames with trailing dots removed.
 func (d *smtpDriver) getMX(domain string) ([]string, error) {
 	domains := make([]string, 0, 5)
 	ctx, cancel := context.WithTimeout(context.Background(), d.timeout)

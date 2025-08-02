@@ -7,30 +7,34 @@ import (
 	"syscall"
 )
 
-// DomainStatus domain node connection status
+// DomainStatus represents the connection status of a domain during certificate discovery.
+// Used to track success, failure, and various error conditions encountered.
 type DomainStatus int
 
-// Status holds the domain status and optionally more information
-// ex: redirects will have the redirected domain in Meta
+// Status holds the domain connection status and optional metadata.
+// The Meta field provides additional context like redirect targets or error details.
 type Status struct {
-	Status DomainStatus
-	Meta   string
+	Status DomainStatus // The primary status code
+	Meta   string       // Additional status information (e.g., redirect target)
 }
 
-// New returns a new Status object with the provided DomainStatus
+// New creates a new Status instance with the specified DomainStatus.
 func New(domainStatus DomainStatus) Status {
 	return Status{
 		Status: domainStatus,
 	}
 }
 
-// NewMeta returns a new Status with the proxied meta
+// NewMeta creates a new Status instance with status and metadata.
+// The metadata provides additional context about the status.
 func NewMeta(domainStatus DomainStatus, meta string) Status {
 	s := New(domainStatus)
 	s.Meta = meta
 	return s
 }
 
+// String returns a formatted string representation of the status.
+// Includes metadata in parentheses if present.
 func (s *Status) String() string {
 	if s.Meta == "" {
 		return s.Status.String()
@@ -38,15 +42,16 @@ func (s *Status) String() string {
 	return fmt.Sprintf("%s(%s)", s.Status.String(), s.Meta)
 }
 
-// Map is a map of returned domains to their status
+// Map represents a collection of domain names mapped to their connection status.
+// Used to track the status of multiple domains discovered during certificate queries.
 type Map map[string]Status
 
-// Set adds the domain and status to the StatusMap
+// Set adds or updates a domain's status in the map.
 func (m Map) Set(domain string, status Status) {
 	m[domain] = status
 }
 
-// NewMap returns a new StatusMap containing the domain and status
+// NewMap creates a new status map initialized with a single domain and status.
 func NewMap(domain string, status Status) Map {
 	m := make(Map)
 	m.Set(domain, status)
@@ -66,7 +71,7 @@ const (
 	MULTI    = iota
 )
 
-// String returns the domain status for printing
+// String returns the human-readable string representation of the domain status.
 func (status DomainStatus) String() string {
 	switch status {
 	case UNKNOWN:
@@ -91,7 +96,8 @@ func (status DomainStatus) String() string {
 	return "?"
 }
 
-// CheckNetErr check for errors, print if network related
+// CheckNetErr analyzes network errors and returns the appropriate DomainStatus.
+// Categorizes errors into specific types like timeouts, connection refused, etc.
 func CheckNetErr(err error) DomainStatus {
 	if err == nil {
 		return GOOD

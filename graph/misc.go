@@ -4,7 +4,8 @@ import (
 	"strings"
 )
 
-// given a domain returns the non-wildcard version of that domain
+// nonWildcard removes the wildcard prefix from a domain name.
+// Converts "*.example.com" to "example.com" for consistent domain handling.
 func nonWildcard(domain string) string {
 	return strings.TrimPrefix(domain, "*.")
 }

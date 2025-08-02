@@ -1,6 +1,14 @@
+// Package main implements certgraph, a tool to crawl the graph of certificate Alternate Names.
+//
+// CertGraph discovers SSL certificates by building a directed graph where each domain is a node
+// and the certificate alternative names are edges to other domain nodes. It supports multiple
+// data sources including direct HTTPS connections, SMTP STARTTLS, and Certificate Transparency
+// logs via crt.sh and Censys.
+//
+// The tool is designed for security reconnaissance and certificate discovery, helping to map
+// an organization's certificate usage and discover related domains through certificate
+// alternative names.
 package main
-
-// cSpell:words certgraph crtsh
 
 import (
 	"embed"
@@ -68,6 +76,9 @@ var config struct {
 	regex               *regexp.Regexp
 }
 
+// init initializes command-line flags and their default values.
+// Sets up all configuration options for certificate discovery including
+// drivers, timeouts, search parameters, and output formats.
 func init() {
 	flag.BoolVar(&config.printVersion, "version", false, "print version and exit")
 	flag.UintVar(&timeoutSeconds, "timeout", 10, "tcp timeout in seconds")
@@ -94,6 +105,9 @@ func init() {
 	}
 }
 
+// main is the entry point for the certgraph application.
+// It parses command-line arguments, initializes the selected certificate discovery driver,
+// and performs a breadth-first search to build the certificate graph.
 func main() {
 	flag.Parse()
 	config.timeout = time.Duration(timeoutSeconds) * time.Second
@@ -186,6 +200,8 @@ func main() {
 	v("Graph Depth:", certGraph.DomainDepth())
 }
 
+// setDriver initializes and returns the appropriate certificate discovery driver(s).
+// It supports single drivers or multiple comma-separated drivers that will be merged.
 func setDriver(name string) (driver.Driver, error) {
 	if strings.Contains(name, ",") {
 		names := strings.Split(name, ",")
@@ -222,20 +238,22 @@ func getDriverSingle(name string) (driver.Driver, error) {
 	return d, err
 }
 
-// verbose logging
+// v prints verbose logging output to stderr when verbose mode is enabled.
 func v(a ...interface{}) {
 	if config.verbose {
 		e(a...)
 	}
 }
 
+// e prints error messages and general output to stderr.
 func e(a ...interface{}) {
 	if a != nil {
 		fmt.Fprintln(os.Stderr, a...)
 	}
 }
 
-// prints the graph as a json object
+// printJSONGraph outputs the complete certificate graph as formatted JSON.
+// Includes both the graph data and metadata about the scan parameters.
 func printJSONGraph() {
 	jsonGraph := certGraph.GenerateMap()
 	jsonGraph["certgraph"] = generateGraphMetadata()
@@ -248,7 +266,11 @@ func printJSONGraph() {
 	fmt.Println(string(j))
 }
 
-// breathFirstSearch perform Breadth first search to build the graph
+// breathFirstSearch performs a breadth-first search to build the certificate graph.
+// It starts from the provided root domains and explores certificate alternative names
+// to discover related domains, respecting the configured maximum depth and parallelism.
+// The function uses multiple goroutines with careful synchronization to efficiently
+// process domains concurrently while avoiding duplicate work.
 func breathFirstSearch(roots []string) {
 	var wg sync.WaitGroup
 	// Dynamic buffer sizing based on parallelism and expected workload
@@ -352,7 +374,10 @@ func breathFirstSearch(roots []string) {
 	<-done // wait for save to finish
 }
 
-// visit visits each node and get and set its neighbors
+// visit processes a single domain node to discover and collect certificate information.
+// It queries the configured driver for certificates, extracts domain alternatives,
+// and updates the graph with discovered relationships. This is the core discovery
+// function that implements the certificate crawling logic.
 func visit(domainNode *graph.DomainNode) {
 	// check NS if necessary
 	if config.checkDNS {
@@ -423,6 +448,8 @@ func visit(domainNode *graph.DomainNode) {
 	//  when we process the related domains
 }
 
+// printNode outputs information about a discovered domain node.
+// The output format depends on the details flag and includes DNS status if enabled.
 func printNode(domainNode *graph.DomainNode) {
 	if config.details {
 		_, _ = fmt.Fprintln(os.Stdout, domainNode)
@@ -447,8 +474,9 @@ func certNodeFromCertResult(certResult *driver.CertResult) *graph.CertNode {
 	return certNode
 }
 
-// generates metadata for the JSON output
-// TODO map all config json
+// generateGraphMetadata creates metadata information for JSON output.
+// Returns a map containing version, scan parameters, and execution details
+// for inclusion in the JSON graph output.
 func generateGraphMetadata() map[string]interface{} {
 	data := make(map[string]interface{})
 	data["version"] = version
@@ -468,14 +496,14 @@ func generateGraphMetadata() map[string]interface{} {
 	return data
 }
 
-// returns the version string
+// showVersion returns a formatted version string for display.
 func showVersion() string {
 	return fmt.Sprintf("Version: %s", version)
 }
 
-// cleanInput attempts to parse the input string as a url to extract the hostname
-// if it fails, then the input string is returned
-// also removes tailing '.'
+// cleanInput normalizes domain input by extracting hostnames from URLs and removing trailing dots.
+// If URL parsing fails, returns the original string. This helps handle various input formats
+// including full URLs, bare domains, and domains with trailing dots.
 func cleanInput(host string) string {
 	host = strings.TrimSuffix(host, ".")
 	u, err := url.Parse(host)

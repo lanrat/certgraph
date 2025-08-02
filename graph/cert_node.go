@@ -9,19 +9,24 @@ import (
 	"github.com/lanrat/certgraph/fingerprint"
 )
 
-// CertNode graph node to store certificate information
+// CertNode represents a certificate in the graph with its associated domains.
+// It tracks which drivers discovered the certificate and provides thread-safe
+// access to the discovery information.
 type CertNode struct {
-	Fingerprint  fingerprint.Fingerprint
-	Domains      []string
-	foundMap     map[string]bool
-	foundMapLock sync.Mutex
+	Fingerprint  fingerprint.Fingerprint // SHA-256 fingerprint of the certificate
+	Domains      []string                // List of domains covered by this certificate
+	foundMap     map[string]bool         // Map of driver names that found this certificate
+	foundMapLock sync.Mutex              // Mutex for thread-safe access to foundMap
 }
 
+// String returns a tab-separated string representation of the certificate node.
+// Format: fingerprint, found_drivers, domains
 func (c *CertNode) String() string {
 	return fmt.Sprintf("%s\t%s\t%v", c.Fingerprint.HexString(), c.Found(), c.Domains)
 }
 
-// Found returns a list of drivers that found this cert
+// Found returns a list of driver names that discovered this certificate.
+// Thread-safe method that returns a copy of the driver list.
 func (c *CertNode) Found() []string {
 	found := make([]string, 0, len(c.foundMap))
 	for i := range c.foundMap {
@@ -30,7 +35,8 @@ func (c *CertNode) Found() []string {
 	return found
 }
 
-// AddFound adds a driver name to the source of the certificate
+// AddFound records that a specific driver discovered this certificate.
+// Thread-safe method that initializes the foundMap if needed.
 func (c *CertNode) AddFound(driver string) {
 	c.foundMapLock.Lock()
 	defer c.foundMapLock.Unlock()
@@ -61,7 +67,8 @@ func (c *CertNode) CDNCert() bool {
 	return false
 }
 
-// ApexCount the number of tld+1 domains in the certificate
+// ApexCount returns the number of unique apex domains (TLD+1) covered by this certificate.
+// This helps identify certificates that cover multiple organizations or domain families.
 func (c *CertNode) ApexCount() int {
 	apexDomains := make(map[string]bool)
 	for _, domain := range c.Domains {
@@ -74,7 +81,8 @@ func (c *CertNode) ApexCount() int {
 	return len(apexDomains)
 }
 
-// ToMap returns a map of the CertNode's fields (weak serialization)
+// ToMap returns a map representation of the certificate node for serialization.
+// Used primarily for JSON export functionality.
 func (c *CertNode) ToMap() map[string]string {
 	m := make(map[string]string)
 	m["type"] = "certificate"

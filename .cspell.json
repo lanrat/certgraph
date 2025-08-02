@@ -13,6 +13,7 @@
         "crtsh",
         "elif",
         "GOARCH",
+        "godoc",
         "golangci",
         "GOPROXY",
         "goreleaser",

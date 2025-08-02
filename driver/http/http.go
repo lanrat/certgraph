@@ -20,35 +20,44 @@ func init() {
 	driver.AddDriver(driverName)
 }
 
+// httpDriver implements certificate discovery through HTTPS connections.
+// It performs TLS handshakes with web servers to retrieve their SSL certificates.
 type httpDriver struct {
-	port      string
-	save      bool
-	savePath  string
-	tlsConfig *tls.Config
-	timeout   time.Duration
+	port      string        // HTTPS port (default: 443)
+	save      bool          // Whether to save certificates to disk
+	savePath  string        // Directory path for saving certificates
+	tlsConfig *tls.Config   // TLS configuration with InsecureSkipVerify
+	timeout   time.Duration // Connection and request timeout
 }
 
+// httpCertDriver represents the result of an HTTP certificate query.
+// It handles TLS connections, redirect following, and certificate collection.
 type httpCertDriver struct {
-	parent       *httpDriver
-	client       *http.Client
-	fingerprints driver.FingerprintMap
-	status       status.Map
-	related      []string
-	certs        map[fingerprint.Fingerprint]*driver.CertResult
+	parent       *httpDriver                                    // Reference to parent driver
+	client       *http.Client                                   // HTTP client with TLS configuration
+	fingerprints driver.FingerprintMap                          // Certificate fingerprints found
+	status       status.Map                                     // Connection status for domains
+	related      []string                                       // Related domains from redirects
+	certs        map[fingerprint.Fingerprint]*driver.CertResult // Certificate details
 }
 
+// GetFingerprints returns the certificate fingerprints discovered through HTTPS.
 func (c *httpCertDriver) GetFingerprints() (driver.FingerprintMap, error) {
 	return c.fingerprints, nil
 }
 
+// GetStatus returns the connection status for domains encountered during the query.
 func (c *httpCertDriver) GetStatus() status.Map {
 	return c.status
 }
 
+// GetRelated returns domains discovered through HTTP redirects.
 func (c *httpCertDriver) GetRelated() ([]string, error) {
 	return c.related, nil
 }
 
+// QueryCert retrieves certificate details for a specific fingerprint.
+// Returns an error if the certificate was not found in this HTTP query.
 func (c *httpCertDriver) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error) {
 	cert, found := c.certs[fp]
 	if found {
@@ -57,7 +66,8 @@ func (c *httpCertDriver) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResu
 	return nil, fmt.Errorf("certificate with Fingerprint %s not found", fp.HexString())
 }
 
-// Driver creates a new SSL driver for HTTP Connections
+// Driver creates a new HTTP certificate discovery driver.
+// Uses HTTPS connections to retrieve certificates from web servers.
 func Driver(timeout time.Duration, savePath string) (driver.Driver, error) {
 	d := new(httpDriver)
 	d.port = "443"
@@ -73,10 +83,13 @@ func Driver(timeout time.Duration, savePath string) (driver.Driver, error) {
 	return d, nil
 }
 
+// GetName returns the driver name for identification.
 func (d *httpDriver) GetName() string {
 	return driverName
 }
 
+// newHTTPCertDriver creates a new HTTP certificate driver instance with optimized connection pooling.
+// Configures HTTP client with TLS settings and redirect handling.
 func (d *httpDriver) newHTTPCertDriver() *httpCertDriver {
 	result := &httpCertDriver{
 		parent:       d,
@@ -106,7 +119,8 @@ func (d *httpDriver) newHTTPCertDriver() *httpCertDriver {
 	return result
 }
 
-// GetCert gets the certificates found for a given domain
+// QueryDomain discovers certificates for a domain through HTTPS connections.
+// Follows redirects and collects certificates from all encountered servers.
 func (d *httpDriver) QueryDomain(host string) (driver.Result, error) {
 	results := d.newHTTPCertDriver()
 
@@ -123,9 +137,9 @@ func (d *httpDriver) QueryDomain(host string) (driver.Result, error) {
 	return results, nil
 }
 
-// only called after a redirect is detected
-// req has the next request to send, via has the last requests
-// not called for the first HTTP request that replied with the initial redirect
+// checkRedirect handles HTTP redirects by tracking status and related domains.
+// Called by the HTTP client when a redirect response is received.
+// req contains the next request, via contains the previous request chain.
 func (c *httpCertDriver) checkRedirect(req *http.Request, via []*http.Request) error {
 	//fmt.Printf("Redirect %s -> %s\n", via[0].URL, req.URL)
 	// set both domain's status's
@@ -139,6 +153,8 @@ func (c *httpCertDriver) checkRedirect(req *http.Request, via []*http.Request) e
 	return nil
 }
 
+// dialTLS establishes TLS connections and captures certificates during the handshake.
+// Custom dialer that extracts certificate information before returning the connection.
 func (c *httpCertDriver) dialTLS(network, addr string) (net.Conn, error) {
 	dialer := &net.Dialer{Timeout: c.client.Timeout}
 	conn, err := tls.DialWithDialer(dialer, network, addr, c.parent.tlsConfig)

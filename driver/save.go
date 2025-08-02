@@ -6,7 +6,8 @@ import (
 	"os"
 )
 
-// CertsToPEMFile saves certificates to local pem file
+// CertsToPEMFile saves a certificate chain to a local PEM file.
+// Skips saving if the file already exists to avoid overwriting.
 func CertsToPEMFile(certs []*x509.Certificate, file string) error {
 	if fileExists(file) {
 		return nil
@@ -25,7 +26,8 @@ func CertsToPEMFile(certs []*x509.Certificate, file string) error {
 	return nil
 }
 
-// RawCertToPEMFile saves raw certificate to local pem file
+// RawCertToPEMFile saves raw certificate bytes to a local PEM file.
+// Skips saving if the file already exists to avoid overwriting.
 func RawCertToPEMFile(cert []byte, file string) error {
 	if fileExists(file) {
 		return nil
@@ -39,6 +41,8 @@ func RawCertToPEMFile(cert []byte, file string) error {
 	return err
 }
 
+// fileExists checks if a file exists at the given path.
+// Returns true if the file exists and can be accessed.
 func fileExists(f string) bool {
 	_, err := os.Stat(f)
 	if os.IsNotExist(err) {

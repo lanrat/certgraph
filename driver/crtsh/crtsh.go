@@ -215,7 +215,7 @@ func (d *crtsh) QueryCert(fp fingerprint.Fingerprint) (*driver.CertResult, error
 	baseDelay := 100 * time.Millisecond
 
 	for try < 5 {
-		// this is a hack while crt.sh gets there stuff togeather
+		// this is a hack while crt.sh gets there stuff together
 		try++
 		rows, err = d.db.Query(queryStr, fp[:])
 		if err == nil {
