@@ -339,7 +339,7 @@ func breathFirstSearch(roots []string) {
 		}
 	}()
 
-	wg.Wait() // wait for querying to finish
+	wg.Wait()                  // wait for querying to finish
 	close(domainNodeInputChan) // close input channel to signal goroutine to exit
 	close(domainNodeOutputChan)
 	<-done // wait for save to finish
