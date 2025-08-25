@@ -25,6 +25,20 @@ builds:
     ldflags:
       - -s -w -X main.version={{.Version}}
 
+nfpms:
+  - id: certgraph
+    # Package info
+    maintainer: lanrat
+    homepage: https://github.com/lanrat/certgraph
+    description: |-
+      An open source intelligence tool to crawl the graph of certificate Alternate Names
+    # Supported formats
+    formats:
+      - deb
+      - rpm
+      - apk
+      - archlinux
+
 archives:
   - # This single archive definition handles all OSes.
     # The default format is 'tar.gz', which is used for linux and darwin.
