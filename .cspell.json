@@ -7,6 +7,7 @@
     "language": "en",
     // words - list of words to be always considered correct
     "words": [
+        "archlinux",
         "bootstrapcdn",
         "Buildx",
         "censys",
@@ -35,6 +36,7 @@
         "linkify",
         "maxcdn",
         "myconstants",
+        "nfpms",
         "NOHOST",
         "Pastemodal",
         "plainto",
