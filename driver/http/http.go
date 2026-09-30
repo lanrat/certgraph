@@ -109,7 +109,7 @@ func (d *httpDriver) newHTTPCertDriver() *httpCertDriver {
 		TLSHandshakeTimeout:   d.timeout,
 		ResponseHeaderTimeout: d.timeout,
 		ExpectContinueTimeout: d.timeout,
-		DialTLS:               result.dialTLS,
+		DialTLSContext:        result.dialTLS,
 		// Connection pooling settings for better performance
 		MaxIdleConns:        100,
 		MaxIdleConnsPerHost: 10,
@@ -161,14 +161,17 @@ func (c *httpCertDriver) checkRedirect(req *http.Request, via []*http.Request) e
 
 // dialTLS establishes TLS connections and captures certificates during the handshake.
 // Custom dialer that extracts certificate information before returning the connection.
-func (c *httpCertDriver) dialTLS(network, addr string) (net.Conn, error) {
-	dialer := &net.Dialer{Timeout: c.client.Timeout}
-	conn, err := tls.DialWithDialer(dialer, network, addr, c.parent.tlsConfig)
-	if conn == nil {
-		return conn, err
+func (c *httpCertDriver) dialTLS(ctx context.Context, network, addr string) (net.Conn, error) {
+	dialer := &tls.Dialer{
+		NetDialer: &net.Dialer{Timeout: c.client.Timeout},
+		Config:    c.parent.tlsConfig,
+	}
+	conn, err := dialer.DialContext(ctx, network, addr)
+	if err != nil {
+		return nil, err
 	}
 	// get certs passing by
-	connState := conn.ConnectionState()
+	connState := conn.(*tls.Conn).ConnectionState()
 
 	// only look at leaf certificate which is valid for domain, rest of cert chain is ignored
 	if len(connState.PeerCertificates) == 0 {
